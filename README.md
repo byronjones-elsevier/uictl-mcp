@@ -29,12 +29,26 @@ success/failure, so it's easy to script or parse.
 
 ## Build
 
+Requires the Xcode command-line tools (Swift 5.9+ toolchain) and macOS 14+.
+From this directory:
+
 ```sh
 swift build -c release
 ```
 
-The binary lands at `.build/release/uictl`. Put it on your `PATH`, or invoke
-it via its full path.
+SwiftPM fetches its two dependencies (swift-argument-parser, the MCP Swift
+SDK) on first build. The binary lands at `.build/release/uictl`. Either
+invoke it by that full path, or put it on your `PATH`:
+
+```sh
+ln -s "$(pwd)/.build/release/uictl" /usr/local/bin/uictl
+uictl --help
+```
+
+During development, use the faster debug build (`swift build`, binary at
+`.build/debug/uictl`) instead. If you rebuild while the daemon is running,
+run `uictl daemon stop` afterward so the next command relaunches it from
+the new binary — otherwise you'll keep talking to the old one.
 
 ## First run: permissions
 
@@ -82,13 +96,43 @@ Run `uictl --help` (also `-h`, `-H`, `--HELP`, `-?`) or `uictl <subcommand>
 
 ## Using it as an MCP server
 
+`uictl mcp` runs as an MCP server over stdio — no separate flags or config
+file of its own; whatever launches it just needs to point at the binary.
+
+**Claude Code** (from this directory, using the release binary built above):
+
 ```sh
-claude mcp add uictl -- /path/to/uictl mcp
+claude mcp add uictl -- "$(pwd)/.build/release/uictl" mcp
 ```
 
-This registers 16 `uictl_*` tools (screenshot, elements, click, type, etc.)
-that a client can call directly with structured arguments instead of
-shelling out to the CLI and parsing stdout.
+Add `--scope user` instead of the default `--scope local` if you want it
+available in every project, not just this one. Verify it registered and
+started correctly:
+
+```sh
+claude mcp list         # should show "uictl" as connected
+claude mcp get uictl     # shows the exact command it's running
+```
+
+**Claude Desktop / other MCP clients** that take a JSON config
+(`claude_desktop_config.json` or equivalent) instead of a CLI flag:
+
+```json
+{
+  "mcpServers": {
+    "uictl": {
+      "command": "/Users/jonesb7/dev/ai-app-info/.build/release/uictl",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Either way, it registers 16 `uictl_*` tools (screenshot, elements, click,
+type, etc.) that a client can call directly with structured arguments
+instead of shelling out to the CLI and parsing stdout. Since it's the same
+daemon underneath either front end, permissions granted via the CLI (or
+vice versa) carry over automatically.
 
 ## Recommended agent workflow
 
