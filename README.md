@@ -121,7 +121,7 @@ claude mcp get uictl     # shows the exact command it's running
 {
   "mcpServers": {
     "uictl": {
-      "command": "/Users/jonesb7/dev/ai-app-info/.build/release/uictl",
+      "command": "/Users/jonesb7/dev/uictl-mcp/.build/release/uictl",
       "args": ["mcp"]
     }
   }
