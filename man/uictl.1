@@ -1,0 +1,133 @@
+.TH UICTL 1 "2026-08-08" "uictl 0.1.0" "User Commands"
+.SH NAME
+uictl \- find, inspect, and drive running macOS GUI applications
+.SH SYNOPSIS
+.B uictl
+.I subcommand
+[options]
+.br
+.B uictl
+.RB [ \-h | \-H | \-\-help | \-\-HELP | \-? ]
+.SH DESCRIPTION
+.B uictl
+locates running applications, lists and activates their windows,
+screenshots them (optionally with a numbered accessibility-element
+overlay), walks their accessibility tree, clicks, types, sends key
+combinations, waits for elements to appear, runs OCR, samples pixel
+colors, and reads/writes the clipboard.
+.PP
+A small background daemon (auto-started on first use, listening on a Unix
+domain socket at \fI~/.uictl/uictl.sock\fR) holds Accessibility / Screen
+Recording permission grants and the element-id cache across invocations.
+.PP
+Every subcommand prints exactly one JSON object to standard output and
+exits 0 on success, non-zero on failure. This output is intended to be
+consumed by scripts or AI agents as readily as by a human.
+.B uictl
+can also run as an MCP server over stdio; see the
+.B mcp
+subcommand below.
+.SH SUBCOMMANDS
+.TP
+.B daemon \fR[start|stop|status]
+Manage the background daemon. \fBstart\fR is invoked automatically by any
+other command if the daemon isn't already running.
+.TP
+.B permissions \fR[--request]
+Check, or trigger the OS prompts for, Accessibility and Screen Recording
+permission.
+.TP
+.B apps \fR[--all]
+List running applications.
+.TP
+.B windows \fR[--app <selector>]
+List on-screen windows, optionally filtered to one application.
+.TP
+.B activate --app <selector> \fR[--window <id>]
+Bring an application, and optionally a specific window, to the front.
+.TP
+.B screenshot \fR(--window <id> | --app <selector> | --screen <n>) [--out <path>] [--annotate] [--role <AXRole>]
+Capture a window or display to a PNG file. With \fB--annotate\fR, overlays
+a numbered box on every accessibility element and returns a JSON legend
+mapping numbers to element ids, roles, titles, and frames.
+.TP
+.B elements \fR(--window <id> | --app <selector>) [--role <r>] [--title <substr>] [--max-depth <n>] [--max-elements <n>]
+Walk a window's accessibility tree; returns each matching element's id,
+role, title, value, and on-screen frame.
+.TP
+.B click \fR(--at <x,y> | --element <id>) [--button left|right|center] [--double] [--count <n>]
+Click at a screen point or on the center of a specific element.
+.TP
+.B move --at <x,y>
+Move the mouse cursor without clicking.
+.TP
+.B scroll --at <x,y> \fR[--dx <n>] [--dy <n>]
+Scroll at a screen point.
+.TP
+.B type \fR<text> [--element <id>]
+Type text into the focused control, or into a specific element (tries
+setting its value directly first, falls back to focus + synthesized
+keystrokes).
+.TP
+.B key \fR<combo>
+Send a keyboard shortcut, e.g. \fIcmd+shift+4\fR or \fIctrl+alt+delete\fR.
+.TP
+.B wait\-for \fR(--window <id> | --app <selector>) [--role <r>] [--title <substr>] [--timeout <seconds>]
+Block until a matching element appears, or the timeout elapses.
+.TP
+.B ocr \fR(--image <path> | --window <id> | --app <selector>) [--region <x,y,w,h>]
+Recognize text in an image file or a captured window, optionally
+restricted to a region.
+.TP
+.B pixel --at <x,y>
+Sample the color of a single screen pixel.
+.TP
+.B clipboard \fR(get | set <text>)
+Read or write the system clipboard.
+.TP
+.B mcp
+Run as an MCP server over stdio, exposing every capability above as an MCP
+tool.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-H ", " \-\-help ", " \-\-HELP ", " \-?
+Show help. All five spellings are accepted at the top level and are
+normalized onto ArgumentParser's native \fB\-\-help\fR.
+.SH EXAMPLES
+.PP
+List an application's windows, then screenshot it with element numbers:
+.PP
+.RS
+.EX
+uictl activate --app Safari
+uictl screenshot --app Safari --annotate --out /tmp/safari.png
+.EE
+.RE
+.PP
+Click the element numbered 7 in that legend's \fIid\fR field, then confirm:
+.PP
+.RS
+.EX
+uictl click --element 12345-7
+uictl elements --app Safari --title "Expected Label"
+.EE
+.RE
+.SH FILES
+.TP
+.I ~/.uictl/uictl.sock
+Daemon IPC socket.
+.TP
+.I ~/.uictl/uictl.pid
+Daemon process id.
+.TP
+.I ~/.uictl/daemon.log
+Daemon stdout/stderr.
+.TP
+.I ~/.uictl/screenshots/
+Default output location for \fBscreenshot\fR when \fB--out\fR is omitted.
+.SH EXIT STATUS
+0 on success (the JSON response's \fIok\fR field is \fItrue\fR); non-zero
+otherwise.
+.SH SEE ALSO
+.BR screencapture (1),
+.BR osascript (1)
