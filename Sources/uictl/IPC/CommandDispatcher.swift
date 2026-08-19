@@ -19,8 +19,10 @@ enum CommandDispatcher {
                 return successResponse(AppsAndWindows.listApps(includeBackground: params["all"] as? Bool ?? false))
 
             case "windows.list":
-                let pid = try (params["app"] as? String).map { try AppSelector.resolve($0).processIdentifier }
-                return successResponse(try AppsAndWindows.listWindows(pidFilter: pid))
+                let pids: Set<pid_t>? = try (params["app"] as? String).map { selector in
+                    Set(try AppSelector.resolveAll(selector).map(\.processIdentifier))
+                }
+                return successResponse(try AppsAndWindows.listWindows(pidFilter: pids))
 
             case "activate":
                 guard let appSelector = params["app"] as? String else {
