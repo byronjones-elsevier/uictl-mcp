@@ -112,13 +112,14 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "click",
-        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error.",
+        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error. Restores the cursor to its pre-click position afterward unless hoverCursor is set.",
                    inputSchema: schema([
                        "at": prop("string", "\"x,y\" screen point."),
                        "element": prop("string", "Element id."),
                        "button": prop("string", "left | right | center"),
                        "double": prop("boolean", "Double-click."),
                        "count": prop("integer", "Click count (e.g. 3 for triple-click)."),
+                       "hoverCursor": prop("boolean", "Leave the cursor at the click point instead of restoring it to where it was before the click (e.g. to keep a hover-dependent tooltip/menu open for a follow-up screenshot)."),
                    ]))
     ),
     ToolSpec(

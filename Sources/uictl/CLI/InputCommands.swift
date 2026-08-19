@@ -18,8 +18,11 @@ struct ClickCommand: ParsableCommand {
     @Option(help: "Click count (e.g. 3 for triple-click). Ignored if --double is set.")
     var count: Int?
 
+    @Flag(help: "Leave the cursor at the click point instead of restoring it to where it was before the click (e.g. to keep a hover-dependent tooltip/menu open for a follow-up screenshot).")
+    var hoverCursor = false
+
     func run() throws {
-        var params: JSONDict = ["button": button, "double": double]
+        var params: JSONDict = ["button": button, "double": double, "hoverCursor": hoverCursor]
         if let at { params["at"] = at }
         if let element { params["element"] = element }
         if let count { params["count"] = count }

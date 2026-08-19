@@ -178,9 +178,10 @@ enum CommandDispatcher {
         let buttonName = (params["button"] as? String ?? "left").lowercased()
         let button: CGMouseButton = buttonName == "right" ? .right : (buttonName == "center" ? .center : .left)
         let count = (params["double"] as? Bool == true) ? 2 : (params["count"] as? Int ?? 1)
+        let hoverCursor = params["hoverCursor"] as? Bool ?? false
 
         let before = axElement.map(ClickVerificationSnapshot.init)
-        try InputSynthesis.click(at: point, button: button, clickCount: count)
+        try InputSynthesis.click(at: point, button: button, clickCount: count, restoreCursor: !hoverCursor)
 
         var data: JSONDict = ["clicked": point.jsonDict]
         if let axElement, let before {
