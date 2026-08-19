@@ -112,7 +112,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "click",
-        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot).",
+        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error.",
                    inputSchema: schema([
                        "at": prop("string", "\"x,y\" screen point."),
                        "element": prop("string", "Element id."),

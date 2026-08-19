@@ -10,6 +10,14 @@ enum InputSynthesis {
         default: (downType, upType) = (.otherMouseDown, .otherMouseUp)
         }
 
+        // A down/up pair alone warps the cursor to `point` as a side effect
+        // of its own mouseCursorPosition, with no preceding pointer-arrival
+        // event. Custom-drawn/webview controls that gate click handling on a
+        // real hover (mouseenter/pointerover) first can miss that — so send
+        // an explicit move and let it settle before clicking.
+        try move(to: point)
+        usleep(15_000)
+
         for clickIndex in 1...max(1, clickCount) {
             guard let down = CGEvent(mouseEventSource: nil, mouseType: downType, mouseCursorPosition: point, mouseButton: button),
                   let up = CGEvent(mouseEventSource: nil, mouseType: upType, mouseCursorPosition: point, mouseButton: button) else {
