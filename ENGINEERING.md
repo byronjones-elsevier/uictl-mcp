@@ -86,6 +86,24 @@ would miss, since it clicks at the AX-reported frame's center in global
 screen coordinates. Verified working end-to-end against TextEdit (multiple
 simultaneous windows, exact frame agreement between AX and CGWindowList).
 
+## App-name resolution across restarts
+
+`AppSelector.resolveAll` treats a `--app`/`app` selector as a numeric pid, a
+reverse-DNS bundle id, or (otherwise) a case-insensitive substring of
+`localizedName` — and a substring can legitimately match more than one
+running instance at once, e.g. right after an app is quit and relaunched,
+where the old and new process briefly overlap in
+`NSWorkspace.runningApplications`, or a helper process shares part of the
+main app's name. `windows.list` uses `resolveAll` and aggregates windows
+across every matching pid, so a restarted app's windows are still found
+without the caller needing to know its new pid. Single-app call sites
+(`activate`, `elements`, `screenshot`, `ocr`, `waitFor`, all via
+`AppSelector.resolve`) instead narrow multiple matches down to one,
+preferring whichever candidate actually has on-screen windows before falling
+back to an exact name match, then the frontmost instance, then the first —
+so a stale, windowless, about-to-terminate instance never wins over the one
+actually on screen.
+
 ## The ArgumentParser async gotcha
 
 Original design used `AsyncParsableCommand` for `Root` and the `mcp`

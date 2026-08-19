@@ -21,7 +21,7 @@ enum AppsAndWindows {
     /// no deprecation concerns there, unlike window-image capture). `layer == 0`
     /// is the normal "app window" layer; menu bar, dock, etc. show up at other
     /// layers.
-    static func listWindows(pidFilter: pid_t?) throws -> [JSONDict] {
+    static func listWindows(pidFilter: Set<pid_t>?) throws -> [JSONDict] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [JSONDict] else {
             throw UICtlError.message("CGWindowListCopyWindowInfo returned nothing")
@@ -33,7 +33,7 @@ enum AppsAndWindows {
                   let boundsDict = entry[kCGWindowBounds as String] as? JSONDict else {
                 return nil
             }
-            if let pidFilter, pidFilter != ownerPID { return nil }
+            if let pidFilter, !pidFilter.contains(ownerPID) { return nil }
 
             let bounds = CGRect(
                 x: boundsDict["X"] as? Double ?? 0,

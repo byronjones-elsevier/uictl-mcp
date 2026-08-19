@@ -30,7 +30,7 @@ enum WindowResolver {
             throw UICtlError.message("either \"window\" or \"app\" is required")
         }
         let app = try AppSelector.resolve(appSelector)
-        let windows = try AppsAndWindows.listWindows(pidFilter: app.processIdentifier)
+        let windows = try AppsAndWindows.listWindows(pidFilter: [app.processIdentifier])
             .filter { ($0["layer"] as? Int ?? 0) == 0 }
         guard let first = windows.first,
               let windowID = first["windowId"] as? Int,
