@@ -12,7 +12,9 @@ enum CommandDispatcher {
     /// here — rather than in each `runX` — covers all of them uniformly.
     static func dispatch(command: String, params: JSONDict) -> JSONDict {
         let start = Date()
-        let response = dispatchInner(command: command, params: params)
+        let response = UICtlGate.commandsEnabled
+            ? dispatchInner(command: command, params: params)
+            : errorResponse("commands are disabled — toggle \"Commands enabled\" in the uictl Activity Log window (uictl log show) back on")
         let durationMs = Date().timeIntervalSince(start) * 1000
         ActivityLog.shared.record(command: command, params: params, response: response, durationMs: durationMs)
         return response

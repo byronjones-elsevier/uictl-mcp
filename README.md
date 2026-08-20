@@ -39,6 +39,9 @@ click/type into it without a human at the keyboard.
 - **Activity log** — an on-screen toast per call plus a live log window
   (`uictl log show`) so whoever's at the machine can see what's being
   automated, and an audit trail exportable as JSON (`uictl log export`).
+  The log window also has a "Commands enabled" checkbox — a kill switch a
+  human at the machine can flip to reject every command while the window
+  stays open, with blocked attempts still showing up in the log.
 - **Feedback** — draft issues/errors/recommendations about uictl itself
   locally (full CRUD, `uictl feedback ...`), check a draft's title against
   existing GitHub issues first to avoid re-reporting something already
