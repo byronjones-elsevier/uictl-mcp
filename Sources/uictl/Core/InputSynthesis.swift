@@ -2,13 +2,29 @@ import CoreGraphics
 import Foundation
 
 enum InputSynthesis {
-    static func click(at point: CGPoint, button: CGMouseButton, clickCount: Int) throws {
+    /// - Parameter restoreCursor: after the click completes, move the cursor
+    ///   back to wherever it was before this call, so driving the UI doesn't
+    ///   leave the human's real cursor sitting at the click point. Pass
+    ///   `false` (`--hover-cursor` at the CLI/MCP layer) to leave it at
+    ///   `point` instead — e.g. to keep a hover-dependent tooltip/menu open
+    ///   for a follow-up screenshot.
+    static func click(at point: CGPoint, button: CGMouseButton, clickCount: Int, restoreCursor: Bool = true) throws {
         let (downType, upType): (CGEventType, CGEventType)
         switch button {
         case .left: (downType, upType) = (.leftMouseDown, .leftMouseUp)
         case .right: (downType, upType) = (.rightMouseDown, .rightMouseUp)
         default: (downType, upType) = (.otherMouseDown, .otherMouseUp)
         }
+
+        let priorPosition = CGEvent(source: nil)?.location
+
+        // A down/up pair alone warps the cursor to `point` as a side effect
+        // of its own mouseCursorPosition, with no preceding pointer-arrival
+        // event. Custom-drawn/webview controls that gate click handling on a
+        // real hover (mouseenter/pointerover) first can miss that — so send
+        // an explicit move and let it settle before clicking.
+        try move(to: point)
+        usleep(15_000)
 
         for clickIndex in 1...max(1, clickCount) {
             guard let down = CGEvent(mouseEventSource: nil, mouseType: downType, mouseCursorPosition: point, mouseButton: button),
@@ -21,6 +37,10 @@ enum InputSynthesis {
             usleep(10_000)
             up.post(tap: .cghidEventTap)
             if clickIndex < clickCount { usleep(50_000) }
+        }
+
+        if restoreCursor, let priorPosition {
+            try move(to: priorPosition)
         }
     }
 

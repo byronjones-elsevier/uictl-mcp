@@ -148,10 +148,15 @@ enum Accessibility {
 
     // MARK: - Interaction
 
-    static func lookupFrame(elementID: String) throws -> CGRect {
+    static func lookupElement(elementID: String) throws -> AXUIElement {
         guard let element = ElementStore.shared.lookup(elementID) else {
             throw UICtlError.message("unknown element id \"\(elementID)\" — run `elements` again, ids are invalidated whenever a window is re-listed")
         }
+        return element
+    }
+
+    static func lookupFrame(elementID: String) throws -> CGRect {
+        let element = try lookupElement(elementID: elementID)
         guard let elementFrame = frame(of: element) else {
             throw UICtlError.message("element \"\(elementID)\" no longer has a frame")
         }

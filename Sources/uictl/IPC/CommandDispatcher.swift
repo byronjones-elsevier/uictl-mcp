@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import ApplicationServices
 
 /// Every request the daemon receives — whether it arrived from a CLI
 /// subcommand or an MCP tool call — funnels through here. Keeping this as one
@@ -155,8 +156,19 @@ enum CommandDispatcher {
 
     private static func runClick(_ params: JSONDict) throws -> JSONDict {
         let point: CGPoint
+        var axElement: AXUIElement?
+
         if let elementID = params["element"] as? String {
-            point = try Accessibility.lookupFrame(elementID: elementID).center
+            let element = try Accessibility.lookupElement(elementID: elementID)
+            guard let elementFrame = Accessibility.frame(of: element) else {
+                throw UICtlError.message("element \"\(elementID)\" no longer has a frame")
+            }
+            let enabled: Bool = Accessibility.attribute(element, kAXEnabledAttribute) ?? true
+            guard enabled else {
+                throw UICtlError.message("element \"\(elementID)\" is disabled (AXEnabled=false); refusing to click")
+            }
+            axElement = element
+            point = elementFrame.center
         } else if let atText = params["at"] as? String {
             point = try parsePoint(atText)
         } else {
@@ -166,9 +178,25 @@ enum CommandDispatcher {
         let buttonName = (params["button"] as? String ?? "left").lowercased()
         let button: CGMouseButton = buttonName == "right" ? .right : (buttonName == "center" ? .center : .left)
         let count = (params["double"] as? Bool == true) ? 2 : (params["count"] as? Int ?? 1)
+        let hoverCursor = params["hoverCursor"] as? Bool ?? false
 
-        try InputSynthesis.click(at: point, button: button, clickCount: count)
-        return successResponse(["clicked": point.jsonDict])
+        let before = axElement.map(ClickVerificationSnapshot.init)
+        try InputSynthesis.click(at: point, button: button, clickCount: count, restoreCursor: !hoverCursor)
+
+        var data: JSONDict = ["clicked": point.jsonDict]
+        if let axElement, let before {
+            usleep(40_000)
+            let after = ClickVerificationSnapshot(element: axElement)
+            if let changed = before.changed(comparedTo: after) {
+                data["verification"] = changed ? "changed" : "unchanged"
+            } else {
+                // Fully custom-drawn/webview elements typically expose neither
+                // AXValue nor AXSelected, so there's nothing here to diff —
+                // say so explicitly rather than implying the click was verified.
+                data["verification"] = "unavailable"
+            }
+        }
+        return successResponse(data)
     }
 
     private static func runType(_ params: JSONDict) throws -> JSONDict {
@@ -232,4 +260,24 @@ enum CommandDispatcher {
 
 private extension CGRect {
     var center: CGPoint { CGPoint(x: midX, y: midY) }
+}
+
+/// Best-effort AX state to diff before/after a click, so `runClick` can
+/// report whether anything observably changed instead of always claiming
+/// success once the CGEvent posted. `nil` from `changed` means the element
+/// exposed neither attribute — most commonly a custom-drawn/webview control,
+/// which is exactly the case with no reliable signal today.
+private struct ClickVerificationSnapshot {
+    let value: String?
+    let selected: Bool?
+
+    init(element: AXUIElement) {
+        value = Accessibility.stringValue(of: element)
+        selected = Accessibility.attribute(element, kAXSelectedAttribute)
+    }
+
+    func changed(comparedTo after: ClickVerificationSnapshot) -> Bool? {
+        guard value != nil || selected != nil else { return nil }
+        return value != after.value || selected != after.selected
+    }
 }
