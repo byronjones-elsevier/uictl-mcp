@@ -1,4 +1,4 @@
-.TH UICTL 1 "2026-08-08" "uictl 0.1.0" "User Commands"
+.TH UICTL 1 "2026-08-20" "uictl 0.1.0" "User Commands"
 .SH NAME
 uictl \- find, inspect, and drive running macOS GUI applications
 .SH SYNOPSIS
@@ -11,14 +11,18 @@ uictl \- find, inspect, and drive running macOS GUI applications
 .SH DESCRIPTION
 .B uictl
 locates running applications, lists and activates their windows,
-screenshots them (optionally with a numbered accessibility-element
-overlay), walks their accessibility tree, clicks, types, sends key
-combinations, waits for elements to appear, runs OCR, samples pixel
-colors, and reads/writes the clipboard.
+enumerates connected displays, screenshots windows or displays
+(optionally with a numbered accessibility-element overlay), walks their
+accessibility tree, clicks, types, sends key combinations, waits for
+elements to appear, runs OCR, samples pixel colors, and reads/writes the
+clipboard.
 .PP
 A small background daemon (auto-started on first use, listening on a Unix
 domain socket at \fI~/.uictl/uictl.sock\fR) holds Accessibility / Screen
 Recording permission grants and the element-id cache across invocations.
+It can also show two small on-screen windows of its own: a brief toast per
+command, and a live activity-log window (\fBlog show\fR) with the option
+to export that log as JSON.
 .PP
 Every subcommand prints exactly one JSON object to standard output and
 exits 0 on success, non-zero on failure. This output is intended to be
@@ -40,8 +44,18 @@ permission.
 .B apps \fR[--all]
 List running applications.
 .TP
+.B displays
+List connected displays: id, global-coordinate bounds (can be negative
+for a display left of/above the primary one), main-display flag, and
+points-to-pixels scale. \fBindex\fR matches what \fBscreenshot --screen\fR
+expects.
+.TP
 .B windows \fR[--app <selector>]
-List on-screen windows, optionally filtered to one application.
+List on-screen windows, optionally filtered to one application. A name
+substring matches, and aggregates windows from, every running instance
+whose name contains it (e.g. both the old and new process right after an
+app restarts). Each window includes a \fBdisplayId\fR matching one from
+\fBdisplays\fR.
 .TP
 .B activate --app <selector> \fR[--window <id>]
 Bring an application, and optionally a specific window, to the front.
@@ -55,14 +69,25 @@ mapping numbers to element ids, roles, titles, and frames.
 Walk a window's accessibility tree; returns each matching element's id,
 role, title, value, and on-screen frame.
 .TP
-.B click \fR(--at <x,y> | --element <id>) [--button left|right|center] [--double] [--count <n>]
-Click at a screen point or on the center of a specific element.
+.B click \fR(--at <x,y> | --element <id>) [--window <id>] [--app <selector>] [--button left|right|center] [--double] [--count <n>] [--hover-cursor]
+Click at a screen point or on the center of a specific element. If
+\fB--window\fR or \fB--app\fR is given alongside \fB--at\fR, the point is
+relative to that window's current top-left corner instead of an absolute
+screen point (ignored/rejected together with \fB--element\fR, which uses
+the element's own position). Restores the cursor to its pre-click position
+afterward unless \fB--hover-cursor\fR is set. When clicking \fB--element\fR,
+the JSON response includes a \fBverification\fR field
+(\fBchanged\fR/\fBunchanged\fR/\fBunavailable\fR) reporting whether the
+element's AX state could be diffed before and after — a successful exit
+status does not by itself mean the click had an effect.
 .TP
-.B move --at <x,y>
-Move the mouse cursor without clicking.
+.B move --at <x,y> \fR[--window <id>] [--app <selector>]
+Move the mouse cursor without clicking. \fB--window\fR/\fB--app\fR make
+\fB--at\fR window-relative, as with \fBclick\fR.
 .TP
-.B scroll --at <x,y> \fR[--dx <n>] [--dy <n>]
-Scroll at a screen point.
+.B scroll --at <x,y> \fR[--window <id>] [--app <selector>] [--dx <n>] [--dy <n>]
+Scroll at a screen point. \fB--window\fR/\fB--app\fR make \fB--at\fR
+window-relative, as with \fBclick\fR.
 .TP
 .B type \fR<text> [--element <id>]
 Type text into the focused control, or into a specific element (tries
@@ -79,11 +104,26 @@ Block until a matching element appears, or the timeout elapses.
 Recognize text in an image file or a captured window, optionally
 restricted to a region.
 .TP
-.B pixel --at <x,y>
-Sample the color of a single screen pixel.
+.B pixel --at <x,y> \fR[--window <id>] [--app <selector>]
+Sample the color of a single screen pixel. \fB--window\fR/\fB--app\fR make
+\fB--at\fR window-relative, as with \fBclick\fR.
 .TP
 .B clipboard \fR(get | set <text>)
 Read or write the system clipboard.
+.TP
+.B log show
+Open the on-screen activity log window: a live table of every CLI/MCP call
+this daemon has handled, with a button to export it as JSON. The daemon
+has no Dock icon or Cmd\-Tab entry (it runs as a background/accessory
+app), so re-run this to bring the window back if it gets buried behind
+others.
+.TP
+.B log export \fR[--out <path>]
+Export the activity log as JSON (defaults under
+\fI~/.uictl/exports/\fR). Params/response values are the same
+summarized/truncated/redacted form shown in \fBlog show\fR's table, not
+necessarily the exact raw payload for calls whose output was longer than
+the truncation limit.
 .TP
 .B mcp
 Run as an MCP server over stdio, exposing every capability above as an MCP
@@ -125,6 +165,18 @@ Daemon stdout/stderr.
 .TP
 .I ~/.uictl/screenshots/
 Default output location for \fBscreenshot\fR when \fB--out\fR is omitted.
+.TP
+.I ~/.uictl/exports/
+Default output location for \fBlog export\fR when \fB--out\fR is omitted.
+.SH SECURITY
+.B ocr\fR, \fBelements\fR, and \fBscreenshot\fR read whatever is genuinely
+on screen, which can include passwords, tokens, or other sensitive text an
+automated app happens to display; that content is not redacted (unlike
+\fBtype\fR/\fBclipboard set\fR/\fBclipboard get\fR text, which is). It can
+end up in the activity log (\fBlog show\fR, \fBlog export\fR) and in
+screenshot files on disk. Manage and dispose of the activity log window,
+its exports, and saved screenshots with the same care as any other
+capture of your screen's contents.
 .SH EXIT STATUS
 0 on success (the JSON response's \fIok\fR field is \fItrue\fR); non-zero
 otherwise.

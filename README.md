@@ -7,19 +7,30 @@ click/type into it without a human at the keyboard.
 
 ## What it does
 
-- **Find & activate** — list running apps and their windows, bring one to
-  the front.
+- **Find & activate** — list running apps and their windows (substring app
+  names match, and aggregate windows across, every running instance — so a
+  just-restarted app is still found under its old query), bring one to the
+  front.
+- **Displays** — enumerate connected displays (id, global-coordinate bounds,
+  main-display flag, points-to-pixels scale), so multi-monitor coordinates
+  (which can be negative for a display left of/above the primary one) are
+  something you can reason about instead of guess at.
 - **Screenshot** — capture a window or a whole display, optionally with a
   numbered "set-of-marks" overlay on every clickable element so a
   vision-capable model can say "click element 7" instead of guessing pixel
   coordinates.
 - **Inspect** — walk an app's accessibility (AX) tree: every element's role,
   title, value, and on-screen frame.
-- **Act** — click (by coordinate or by element id), move, scroll, type
-  (direct value-set or synthesized keystrokes), send key combos.
+- **Act** — click (by coordinate, by element id, or window-relative to a
+  given `--window`/`--app`), move, scroll, type (direct value-set or
+  synthesized keystrokes), send key combos. Element clicks report back
+  whether the click's effect could be verified.
 - **Wait** — block until an element matching a role/title appears.
 - **Read** — OCR a window or image region, sample a pixel's color,
   read/write the clipboard.
+- **Activity log** — an on-screen toast per call plus a live log window
+  (`uictl log show`) so whoever's at the machine can see what's being
+  automated, and an audit trail exportable as JSON (`uictl log export`).
 - **MCP server** — every capability above is also exposed as an MCP tool
   over stdio, so an MCP-aware client can call `uictl_screenshot`,
   `uictl_click`, etc. directly instead of shelling out and parsing JSON.
@@ -75,11 +86,13 @@ front end you used to get there. See `ENGINEERING.md` for the details.
 
 ```sh
 uictl apps                                   # list running apps
+uictl displays                               # enumerate connected displays
 uictl windows --app Safari                   # list an app's windows
 uictl activate --app Safari                  # bring it to front
 uictl screenshot --app Safari --annotate     # numbered element overlay + legend
 uictl elements --app Safari --role AXButton  # just the buttons
 uictl click --element 12345-7                # click element 7 from that legend
+uictl click --window 12345 --at 20,15        # click relative to a window's top-left corner
 uictl type --element 12345-9 "hello"         # type into a specific field
 uictl type "hello"                           # type into whatever's focused
 uictl key "cmd+shift+4"                      # keyboard shortcut
@@ -87,6 +100,8 @@ uictl wait-for --app Safari --title "Done"   # poll for an element
 uictl ocr --app Safari                       # read on-screen text
 uictl pixel --at 100,200                     # sample a pixel's color
 uictl clipboard get / set "text"
+uictl log show                               # open the live activity log window
+uictl log export                             # export it as JSON
 uictl daemon status / stop
 ```
 
@@ -128,11 +143,11 @@ claude mcp get uictl     # shows the exact command it's running
 }
 ```
 
-Either way, it registers 16 `uictl_*` tools (screenshot, elements, click,
-type, etc.) that a client can call directly with structured arguments
-instead of shelling out to the CLI and parsing stdout. Since it's the same
-daemon underneath either front end, permissions granted via the CLI (or
-vice versa) carry over automatically.
+Either way, it registers 19 `uictl_*` tools (screenshot, elements, click,
+type, displays, log_show, log_export, etc.) that a client can call directly
+with structured arguments instead of shelling out to the CLI and parsing
+stdout. Since it's the same daemon underneath either front end, permissions
+granted via the CLI (or vice versa) carry over automatically.
 
 ## Recommended agent workflow
 
@@ -163,3 +178,22 @@ See `AGENTS.md` for a more detailed walkthrough and gotchas.
   macOS has no public API mapping a `CGWindowID` directly to an
   `AXUIElement`. This is the standard approach used by most macOS UI
   automation tools, but is a heuristic.
+- **uictl can't reliably drive its own GUI.** The activity log window
+  (`uictl log show`) is uictl's own on-screen UI; clicking its controls via
+  `uictl click` (rather than a real mouse) is unreliable — a self-referential
+  edge case that doesn't affect driving any other app. See `ENGINEERING.md`
+  for what was tried.
+- The daemon runs with no Dock icon and no Cmd-Tab entry (it's a background
+  `.accessory` app), so if the activity log window gets buried behind other
+  windows, Cmd-Tab won't bring it back — run `uictl log show` again instead.
+
+## Security note
+
+`ocr`, `elements`, and `screenshot` read whatever is genuinely on screen,
+which can include passwords, tokens, or other sensitive text an automated
+app happens to display; that content is **not** redacted (unlike
+`type`/`clipboard set`/`clipboard get` text, which is — see
+`ENGINEERING.md`). It can end up in the activity log window, in
+`uictl log export`'s JSON output, and in saved screenshot files. Manage and
+dispose of those the same way you would any other capture of your screen's
+contents.

@@ -26,14 +26,17 @@ uictl [-h | -H | --help | --HELP | -?]</pre>
 
 <h2>Description</h2>
 <p><code>uictl</code> locates running applications, lists and activates their
-windows, screenshots them (optionally with a numbered accessibility-element
-overlay), walks their accessibility tree, clicks, types, sends key
-combinations, waits for elements to appear, runs OCR, samples pixel colors,
-and reads/writes the clipboard.</p>
+windows, enumerates connected displays, screenshots windows or displays
+(optionally with a numbered accessibility-element overlay), walks their
+accessibility tree, clicks, types, sends key combinations, waits for
+elements to appear, runs OCR, samples pixel colors, and reads/writes the
+clipboard.</p>
 <p>A small background daemon (auto-started on first use, listening on a Unix
 domain socket at <code>~/.uictl/uictl.sock</code>) holds Accessibility /
 Screen Recording permission grants and the element-id cache across
-invocations.</p>
+invocations. It can also show two small on-screen windows of its own: a
+brief toast per command, and a live activity-log window (<code>log
+show</code>) with the option to export that log as JSON.</p>
 <p>Every subcommand prints exactly one JSON object to standard output and
 exits 0 on success, non-zero on failure. This output is intended to be
 consumed by scripts or AI agents as readily as by a human. <code>uictl</code>
@@ -51,8 +54,11 @@ can also run as an <strong>MCP server</strong> over stdio; see the
 <dt>apps [--all]</dt>
 <dd>List running applications.</dd>
 
+<dt>displays</dt>
+<dd>List connected displays: id, global-coordinate bounds (can be negative for a display left of/above the primary one), main-display flag, and points-to-pixels scale. <code>index</code> matches what <code>screenshot --screen</code> expects.</dd>
+
 <dt>windows [--app &lt;selector&gt;]</dt>
-<dd>List on-screen windows, optionally filtered to one application.</dd>
+<dd>List on-screen windows, optionally filtered to one application. A name substring matches, and aggregates windows from, every running instance whose name contains it (e.g. both the old and new process right after an app restarts). Each window includes a <code>displayId</code> matching one from <code>displays</code>.</dd>
 
 <dt>activate --app &lt;selector&gt; [--window &lt;id&gt;]</dt>
 <dd>Bring an application, and optionally a specific window, to the front.</dd>
@@ -63,14 +69,14 @@ can also run as an <strong>MCP server</strong> over stdio; see the
 <dt>elements (--window &lt;id&gt; | --app &lt;selector&gt;) [--role &lt;r&gt;] [--title &lt;substr&gt;] [--max-depth &lt;n&gt;] [--max-elements &lt;n&gt;]</dt>
 <dd>Walk a window's accessibility tree; returns each matching element's id, role, title, value, and on-screen frame.</dd>
 
-<dt>click (--at &lt;x,y&gt; | --element &lt;id&gt;) [--button left|right|center] [--double] [--count &lt;n&gt;]</dt>
-<dd>Click at a screen point or on the center of a specific element.</dd>
+<dt>click (--at &lt;x,y&gt; | --element &lt;id&gt;) [--window &lt;id&gt;] [--app &lt;selector&gt;] [--button left|right|center] [--double] [--count &lt;n&gt;] [--hover-cursor]</dt>
+<dd>Click at a screen point or on the center of a specific element. If <code>--window</code> or <code>--app</code> is given alongside <code>--at</code>, the point is relative to that window's current top-left corner instead of an absolute screen point (rejected together with <code>--element</code>, which uses the element's own position). Restores the cursor to its pre-click position afterward unless <code>--hover-cursor</code> is set. When clicking <code>--element</code>, the JSON response includes a <code>verification</code> field (<code>changed</code>/<code>unchanged</code>/<code>unavailable</code>) reporting whether the element's AX state could be diffed before and after — a successful exit status does not by itself mean the click had an effect.</dd>
 
-<dt>move --at &lt;x,y&gt;</dt>
-<dd>Move the mouse cursor without clicking.</dd>
+<dt>move --at &lt;x,y&gt; [--window &lt;id&gt;] [--app &lt;selector&gt;]</dt>
+<dd>Move the mouse cursor without clicking. <code>--window</code>/<code>--app</code> make <code>--at</code> window-relative, as with <code>click</code>.</dd>
 
-<dt>scroll --at &lt;x,y&gt; [--dx &lt;n&gt;] [--dy &lt;n&gt;]</dt>
-<dd>Scroll at a screen point.</dd>
+<dt>scroll --at &lt;x,y&gt; [--window &lt;id&gt;] [--app &lt;selector&gt;] [--dx &lt;n&gt;] [--dy &lt;n&gt;]</dt>
+<dd>Scroll at a screen point. <code>--window</code>/<code>--app</code> make <code>--at</code> window-relative, as with <code>click</code>.</dd>
 
 <dt>type &lt;text&gt; [--element &lt;id&gt;]</dt>
 <dd>Type text into the focused control, or into a specific element (tries setting its value directly first, falls back to focus + synthesized keystrokes).</dd>
@@ -84,11 +90,17 @@ can also run as an <strong>MCP server</strong> over stdio; see the
 <dt>ocr (--image &lt;path&gt; | --window &lt;id&gt; | --app &lt;selector&gt;) [--region &lt;x,y,w,h&gt;]</dt>
 <dd>Recognize text in an image file or a captured window, optionally restricted to a region.</dd>
 
-<dt>pixel --at &lt;x,y&gt;</dt>
-<dd>Sample the color of a single screen pixel.</dd>
+<dt>pixel --at &lt;x,y&gt; [--window &lt;id&gt;] [--app &lt;selector&gt;]</dt>
+<dd>Sample the color of a single screen pixel. <code>--window</code>/<code>--app</code> make <code>--at</code> window-relative, as with <code>click</code>.</dd>
 
 <dt>clipboard (get | set &lt;text&gt;)</dt>
 <dd>Read or write the system clipboard.</dd>
+
+<dt>log show</dt>
+<dd>Open the on-screen activity log window: a live table of every CLI/MCP call this daemon has handled, with a button to export it as JSON. The daemon has no Dock icon or Cmd-Tab entry (it runs as a background/accessory app), so re-run this to bring the window back if it gets buried behind others.</dd>
+
+<dt>log export [--out &lt;path&gt;]</dt>
+<dd>Export the activity log as JSON (defaults under <code>~/.uictl/exports/</code>). Params/response values are the same summarized/truncated/redacted form shown in <code>log show</code>'s table, not necessarily the exact raw payload for calls whose output was longer than the truncation limit.</dd>
 
 <dt>mcp</dt>
 <dd>Run as an MCP server over stdio, exposing every capability above as an MCP tool.</dd>
@@ -113,7 +125,16 @@ uictl elements --app Safari --title "Expected Label"</pre>
 <dt>~/.uictl/uictl.pid</dt><dd>Daemon process id.</dd>
 <dt>~/.uictl/daemon.log</dt><dd>Daemon stdout/stderr.</dd>
 <dt>~/.uictl/screenshots/</dt><dd>Default output location for <code>screenshot</code> when <code>--out</code> is omitted.</dd>
+<dt>~/.uictl/exports/</dt><dd>Default output location for <code>log export</code> when <code>--out</code> is omitted.</dd>
 </dl>
+
+<h2>Security</h2>
+<p><code>ocr</code>, <code>elements</code>, and <code>screenshot</code> read whatever is genuinely
+on screen, which can include passwords, tokens, or other sensitive text an automated app happens
+to display; that content is not redacted (unlike <code>type</code>/<code>clipboard set</code>/<code>clipboard get</code>
+text, which is). It can end up in the activity log (<code>log show</code>, <code>log export</code>)
+and in screenshot files on disk. Manage and dispose of the activity log window, its exports, and
+saved screenshots with the same care as any other capture of your screen's contents.</p>
 
 <h2>Exit status</h2>
 <p>0 on success (the JSON response's <code>ok</code> field is <code>true</code>); non-zero otherwise.</p>
