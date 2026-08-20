@@ -19,6 +19,10 @@ enum UICtlPaths {
         homeDir + "/daemon.log"
     }
 
+    static var feedbackFilePath: String {
+        homeDir + "/feedback.json"
+    }
+
     static func ensureHomeDir() throws {
         try FileManager.default.createDirectory(atPath: homeDir, withIntermediateDirectories: true)
     }

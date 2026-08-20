@@ -37,6 +37,7 @@ struct Root: ParsableCommand {
             PixelCommand.self,
             ClipboardCommand.self,
             LogCommand.self,
+            FeedbackCommand.self,
             MCPCommand.self,
         ]
     )

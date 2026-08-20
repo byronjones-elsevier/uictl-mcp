@@ -14,6 +14,8 @@ MCP tool call  ───┘
 - **MCP server** (`Sources/uictl/MCP/*`, `uictl mcp`): same thing, one layer
   up — each MCP tool call also just calls `DaemonClient.send`. This is why
   CLI and MCP usage share state transparently (see "element ids" below).
+  One exception: `uictl_feedback_submit` (`MCP/FeedbackSubmission.swift`) —
+  see "Feedback submission & MCP elicitation" below.
 - **DaemonClient/DaemonServer** (`Sources/uictl/IPC/*`): a length-prefixed
   JSON protocol over a Unix domain socket, one request/response per
   connection. `DaemonClient` auto-spawns the daemon (`uictl daemon start
@@ -30,6 +32,11 @@ MCP tool call  ───┘
 - **GUI** (`Sources/uictl/GUI/*`): the daemon's own on-screen UI — a
   per-call toast and the `uictl log show` activity-log window. See
   "Activity log window" below.
+- **Feedback** (`Core/FeedbackStore.swift`, `Core/GitHubIssues.swift`,
+  `Core/GitHubToken.swift`): local CRUD storage for feedback about uictl
+  itself, plus the GitHub REST client used to check a draft against
+  existing issues before submitting. See "Feedback submission & MCP
+  elicitation" below.
 
 ## Why a daemon at all
 
@@ -94,6 +101,74 @@ containing sensitive data: don't leave the log window on-screen or its
 exports lying around on a shared or untrusted machine, and manage/dispose of
 screenshot files with the same care as any other capture of your screen's
 contents.
+
+## Feedback submission & MCP elicitation
+
+`feedback create`/`list`/`get`/`update`/`delete` are plain `FeedbackStore`
+(`Core/FeedbackStore.swift`) forwards — a single `~/.uictl/feedback.json`
+(`{nextId, entries}`), read-modify-written per call under a serial
+`DispatchQueue`, same "not a hot path, no need for an in-memory cache"
+reasoning as `ActivityLog`.
+
+**Duplicate checking.** `feedback.checkDuplicates`/`feedback.submit`
+(`CommandDispatcher.swift`) call `GitHubIssues.fetchAll` (a plain
+`GET /repos/{repo}/issues?state=all`, paginated, `Core/GitHubIssues.swift`)
+and diff the draft's title against every result with a deliberately simple
+case-insensitive-equality-or-substring heuristic — not fuzzy matching. A
+token is required for a private repo; `GitHubToken.resolve` tries an
+explicit param, then `$GITHUB_TOKEN`, then `gh auth token` (handy since a
+dev machine often already has `gh` authenticated) before giving up. Every
+failure mode — no token, rate limit, network error — surfaces as
+`GitHubIssuesError.unavailable`, which `feedback.submit` treats as "skip
+the check" rather than a hard failure: **graceful degradation is load-
+bearing here**, not an edge case to tolerate. When a duplicate *is* found,
+`feedback.submit` deletes the local entry and returns without opening
+anything — re-reporting an already-filed issue was treated as strictly
+worse than occasionally missing a real duplicate due to the simple
+heuristic.
+
+**Why elicitation breaks the "everything forwards to the dispatcher"
+rule.** `uictl_feedback_submit` (`MCP/FeedbackSubmission.swift`) is the one
+capability whose logic doesn't live in `CommandDispatcher` — `MCP.Server`'s
+`requestElicitation(...)` (form and URL modes; vendored SDK,
+`.build/checkouts/swift-sdk/Sources/MCP/Server/Server.swift`) only exists
+on the live `Server` object inside the `uictl mcp` process, which is
+talking to a real MCP client over stdio. The daemon process has no
+connection to any MCP client at all (it only speaks the Unix-socket
+protocol to `DaemonClient`), so it structurally cannot be the one to call
+it. `MCPServer.swift`'s `CallTool` handler special-cases this one tool
+name instead of forwarding it through the generic `toolDefinitions` loop;
+`FeedbackSubmission.handle` then talks back to the daemon via ordinary
+`DaemonClient.send` calls (`feedback.get`, `.checkDuplicates`, `.update`,
+`.buildUrl`, `.markSubmitted`, and `.submit` as the fallback) for
+everything that *isn't* elicitation-specific.
+
+The flow: check for a duplicate first (skip the rest entirely if found) →
+form-mode elicitation to review/edit title+body → URL-mode elicitation
+handing the client the pre-filled GitHub URL. If either elicitation isn't
+supported (or the human doesn't respond), it falls back to the same
+non-interactive path `feedback submit` uses from the CLI — opening the URL
+directly via `NSWorkspace.shared.open` on the daemon's own machine — rather
+than failing the tool call outright.
+
+**The SDK has no elicitation timeout, and `withThrowingTaskGroup` didn't
+work as a substitute.** `Server.Configuration.strict` (what would make a
+missing client capability throw early) defaults to `false`, and
+`sendAndAwait` has no timeout of its own — an elicitation-incapable or
+unresponsive client would otherwise hang the tool call forever. The
+obvious fix, racing the elicitation call against a `Task.sleep` inside a
+`withThrowingTaskGroup`, was built and reproducibly did *not* work: logging
+confirmed the timeout child task fired and threw right on schedule, but
+`group.next()` never returned while the other child (the elicitation call,
+never going to resolve since nothing was answering it) was still
+outstanding — root cause not isolated, plausibly some interaction between
+the vendored SDK's continuation-based `sendAndAwait` and task-group
+child join/cancellation. The working replacement
+(`FeedbackSubmission.swift`'s private `withTimeout`) avoids joining
+entirely: two fully independent, un-grouped `Task`s race to resume a
+single `NSLock`-guarded `CheckedContinuation`, so the loser (the
+elicitation call, if the timeout wins) can just be silently abandoned —
+this process never needs to wait on it again, unlike a task-group child.
 
 ## Coordinate spaces
 
@@ -240,3 +315,13 @@ bridging mechanism, used consistently, instead of two competing ones.
    MCP-callable.
 5. Rebuild (`swift build`), restart the daemon (`uictl daemon stop`; it
    auto-restarts on the next command) so it picks up the new binary.
+
+The one exception to steps 2–4 being a thin forward: a capability that
+needs the MCP `Server` object itself (elicitation, sampling, anything else
+that only exists on the live client connection) can't live in
+`CommandDispatcher` at all, since the daemon has no such connection. See
+`uictl_feedback_submit`/`MCP/FeedbackSubmission.swift` under "Feedback
+submission & MCP elicitation" for the pattern: special-case the tool name
+in `MCPServer.swift`'s `CallTool` handler instead of registering it in the
+generic forwarding loop, and have that handler call back into the
+dispatcher via ordinary `DaemonClient.send` for the non-elicitation parts.

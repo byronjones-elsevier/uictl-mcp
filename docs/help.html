@@ -102,6 +102,27 @@ can also run as an <strong>MCP server</strong> over stdio; see the
 <dt>log export [--out &lt;path&gt;]</dt>
 <dd>Export the activity log as JSON (defaults under <code>~/.uictl/exports/</code>). Params/response values are the same summarized/truncated/redacted form shown in <code>log show</code>'s table, not necessarily the exact raw payload for calls whose output was longer than the truncation limit.</dd>
 
+<dt>feedback create --category &lt;issue|error|recommendation&gt; --title &lt;t&gt; --body &lt;b&gt;</dt>
+<dd>Draft a new local feedback entry about uictl itself. Stored locally (<code>~/.uictl/feedback.json</code>); nothing is sent anywhere until <code>feedback submit</code>.</dd>
+
+<dt>feedback list</dt>
+<dd>List all local feedback entries (drafts and previously submitted).</dd>
+
+<dt>feedback get &lt;id&gt;</dt>
+<dd>Show one local feedback entry in full.</dd>
+
+<dt>feedback update &lt;id&gt; [--category &lt;c&gt;] [--title &lt;t&gt;] [--body &lt;b&gt;]</dt>
+<dd>Edit a local feedback entry.</dd>
+
+<dt>feedback delete &lt;id&gt;</dt>
+<dd>Delete a local feedback entry.</dd>
+
+<dt>feedback check-duplicates &lt;id&gt; [--repo &lt;owner/repo&gt;] [--token &lt;t&gt;]</dt>
+<dd>Check this entry's title against existing GitHub issues (open and closed) without submitting anything. Needs a token if the repo is private — pass <code>--token</code>, set <code>$GITHUB_TOKEN</code>, or have <code>gh</code> already authenticated; otherwise reports that it couldn't check rather than blocking. <code>feedback submit</code> runs this same check automatically.</dd>
+
+<dt>feedback submit &lt;id&gt; [--repo &lt;owner/repo&gt;] [--token &lt;t&gt;]</dt>
+<dd>First runs <code>check-duplicates</code>; if a likely duplicate is found, the local entry is deleted and nothing is opened. Otherwise opens GitHub's new-issue page with this entry's title/body pre-filled (defaults to uictl's own repo) — it does not create the issue; a human still has to review and click "Create" there. Running this command from a terminal is treated as your confirmation. The <code>uictl_feedback_submit</code> MCP tool instead uses MCP elicitation to ask you to review (and optionally edit) the entry first, since an agent may call it without you having typed anything yourself.</dd>
+
 <dt>mcp</dt>
 <dd>Run as an MCP server over stdio, exposing every capability above as an MCP tool.</dd>
 </dl>
@@ -126,6 +147,7 @@ uictl elements --app Safari --title "Expected Label"</pre>
 <dt>~/.uictl/daemon.log</dt><dd>Daemon stdout/stderr.</dd>
 <dt>~/.uictl/screenshots/</dt><dd>Default output location for <code>screenshot</code> when <code>--out</code> is omitted.</dd>
 <dt>~/.uictl/exports/</dt><dd>Default output location for <code>log export</code> when <code>--out</code> is omitted.</dd>
+<dt>~/.uictl/feedback.json</dt><dd>Local storage for <code>feedback</code> entries (drafts and previously submitted).</dd>
 </dl>
 
 <h2>Security</h2>

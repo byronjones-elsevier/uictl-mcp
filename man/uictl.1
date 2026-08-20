@@ -125,6 +125,41 @@ summarized/truncated/redacted form shown in \fBlog show\fR's table, not
 necessarily the exact raw payload for calls whose output was longer than
 the truncation limit.
 .TP
+.B feedback create --category <issue|error|recommendation> --title <t> --body <b>
+Draft a new local feedback entry about uictl itself. Stored locally
+(\fI~/.uictl/feedback.json\fR); nothing is sent anywhere until \fBfeedback
+submit\fR.
+.TP
+.B feedback list
+List all local feedback entries (drafts and previously submitted).
+.TP
+.B feedback get <id>
+Show one local feedback entry in full.
+.TP
+.B feedback update <id> \fR[--category <c>] [--title <t>] [--body <b>]
+Edit a local feedback entry.
+.TP
+.B feedback delete <id>
+Delete a local feedback entry.
+.TP
+.B feedback check\-duplicates <id> \fR[--repo <owner/repo>] [--token <t>]
+Check this entry's title against existing GitHub issues (open and closed)
+without submitting anything. Needs a token if the repo is private — pass
+\fB--token\fR, set \fB$GITHUB_TOKEN\fR, or have \fBgh\fR already
+authenticated; otherwise reports that it couldn't check rather than
+blocking. \fBfeedback submit\fR runs this same check automatically.
+.TP
+.B feedback submit <id> \fR[--repo <owner/repo>] [--token <t>]
+First runs \fBcheck\-duplicates\fR; if a likely duplicate is found, the
+local entry is deleted and nothing is opened. Otherwise opens GitHub's
+new-issue page with this entry's title/body pre-filled (defaults to
+uictl's own repo) — it does not create the issue; a human still has to
+review and click "Create" there. Running this command from a terminal is
+treated as your confirmation. The \fBuictl_feedback_submit\fR MCP tool
+instead uses MCP elicitation to ask you to review (and optionally edit)
+the entry first, since an agent may call it without you having typed
+anything yourself.
+.TP
 .B mcp
 Run as an MCP server over stdio, exposing every capability above as an MCP
 tool.
@@ -168,6 +203,9 @@ Default output location for \fBscreenshot\fR when \fB--out\fR is omitted.
 .TP
 .I ~/.uictl/exports/
 Default output location for \fBlog export\fR when \fB--out\fR is omitted.
+.TP
+.I ~/.uictl/feedback.json
+Local storage for \fBfeedback\fR entries (drafts and previously submitted).
 .SH SECURITY
 .B ocr\fR, \fBelements\fR, and \fBscreenshot\fR read whatever is genuinely
 on screen, which can include passwords, tokens, or other sensitive text an

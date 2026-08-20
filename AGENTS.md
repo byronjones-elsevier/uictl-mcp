@@ -142,6 +142,35 @@ want to make the automation visible rather than silent — call
 the params/response shown there are summarized and truncated, and that
 `ocr`/`elements`/`screenshot` output isn't redacted (see the gotcha above).
 
+## Reporting feedback about uictl itself
+
+If you hit a real bug, an inconsistency, or have a concrete improvement
+idea *about uictl* (not the app you're driving), you can file it yourself
+instead of just telling the human and hoping they remember to write it up:
+
+```sh
+uictl feedback create --category error --title "..." --body "..."
+uictl feedback submit <id>
+```
+
+(`category` is one of `issue`, `error`, `recommendation`.) `create` only
+writes to `~/.uictl/feedback.json` — nothing leaves this machine yet.
+`submit` first checks the title against existing GitHub issues and, if it
+finds a likely match, just deletes your local draft instead of submitting
+a duplicate. Otherwise it opens a GitHub "new issue" page with the
+title/body pre-filled; a human still has to review and click "Create"
+there — it does not file the issue on your behalf.
+
+Calling `uictl_feedback_submit` over MCP is different on purpose: since
+you (the agent) are the one initiating something outward-facing, it uses
+MCP elicitation to ask the human to review — and optionally edit — the
+content *before* anything is checked or opened, then hands the pre-filled
+URL to the client via a second, URL-mode elicitation rather than silently
+opening a browser tab. If the connected client doesn't support
+elicitation, it falls back to the same direct-open behavior as the CLI
+after a ~2 minute wait — so don't assume the tool call hung if it takes a
+little while to return.
+
 ## MCP mode
 
 If your harness supports MCP tools directly, prefer that over shelling out:
