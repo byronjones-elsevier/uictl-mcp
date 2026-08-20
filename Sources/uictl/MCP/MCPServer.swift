@@ -203,6 +203,16 @@ private let toolDefinitions: [ToolSpec] = [
                    inputSchema: schema(["text": prop("string", "Text to place on the clipboard.")], required: ["text"]))
     ),
     ToolSpec(
+        command: "log.show",
+        tool: Tool(name: "uictl_log_show", description: "Open the on-screen activity log window, showing a live list of every CLI/MCP call this daemon has handled — useful to let whoever is at this machine see what's being automated.",
+                   inputSchema: schema([:]))
+    ),
+    ToolSpec(
+        command: "log.export",
+        tool: Tool(name: "uictl_log_export", description: "Export the daemon's activity log (every CLI/MCP call it has handled, most recent ~2000) as a JSON file.",
+                   inputSchema: schema(["out": prop("string", "Output JSON path. Defaults under ~/.uictl/exports/.")]))
+    ),
+    ToolSpec(
         command: "permissions.status",
         tool: Tool(name: "uictl_permissions", description: "Check Accessibility and Screen Recording permission status.", inputSchema: schema([:]))
     ),

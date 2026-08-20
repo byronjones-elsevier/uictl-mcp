@@ -7,7 +7,17 @@ import ApplicationServices
 /// switch (rather than scattering dispatch logic across command types) means
 /// the CLI and MCP front ends can stay as thin, dumb translators.
 enum CommandDispatcher {
+    /// Every CLI/MCP call funnels through here, so timing/logging it once
+    /// here — rather than in each `runX` — covers all of them uniformly.
     static func dispatch(command: String, params: JSONDict) -> JSONDict {
+        let start = Date()
+        let response = dispatchInner(command: command, params: params)
+        let durationMs = Date().timeIntervalSince(start) * 1000
+        ActivityLog.shared.record(command: command, params: params, response: response, durationMs: durationMs)
+        return response
+    }
+
+    private static func dispatchInner(command: String, params: JSONDict) -> JSONDict {
         do {
             switch command {
             case "permissions.status":
@@ -79,6 +89,15 @@ enum CommandDispatcher {
             case "pixel":
                 return successResponse(try PixelSampler.colorAt(point: try resolvePoint(params)))
 
+            case "log.show":
+                DispatchQueue.main.async { ActivityWindowController.shared.showWindow(nil) }
+                return successResponse(["shown": true])
+
+            case "log.export":
+                let path = (params["out"] as? String) ?? defaultExportPath()
+                try ActivityLog.shared.exportJSON(to: path)
+                return successResponse(["path": path])
+
             default:
                 return errorResponse("unknown command \"\(command)\"")
             }
@@ -133,6 +152,13 @@ enum CommandDispatcher {
         formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime, .withColonSeparatorInTime]
         let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         return UICtlPaths.homeDir + "/screenshots/\(stamp).png"
+    }
+
+    private static func defaultExportPath() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime, .withColonSeparatorInTime]
+        let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        return UICtlPaths.homeDir + "/exports/uictl-activity-\(stamp).json"
     }
 
     // MARK: - Elements

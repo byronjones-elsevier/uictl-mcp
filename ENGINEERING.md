@@ -39,6 +39,25 @@ an `AXUIElement` reference across invocations. Since `elements`/`screenshot
 <id>` needs to resolve back to a live `AXUIElement`, that cache has to live
 somewhere longer-lived than one CLI invocation — hence the daemon.
 
+## Activity log window
+
+Every command that reaches `CommandDispatcher.dispatch` is timed and recorded
+into `ActivityLog.shared` (`Core/ActivityLog.swift`), which the GUI layer
+(`Sources/uictl/GUI/*`) observes to show a transient toast per call and drive
+the `uictl log show` window. This is the first on-screen UI anywhere in this
+codebase, which mattered for `DaemonServer.run`: it previously ran a bare
+blocking `accept()` loop directly on the main thread, but an `NSApplication`
+run loop (needed to pump events for any window) can't share a thread with a
+permanently-blocking BSD socket call. The accept/dispatch loop now runs on a
+dedicated background `Thread` (`DaemonServer.acceptLoop`, unchanged otherwise
+— still one request at a time), freeing the main thread for
+`NSApplication.shared.run()`. The app runs with `.accessory` activation
+policy (no Dock icon/app-switcher entry) — it's still a background daemon,
+just one that can now show a couple of small windows. Because dispatch runs
+on the background thread while AppKit runs on the main thread, every UI
+update the GUI layer makes in response to a recorded call
+(`ActivityLog.onRecord`) hops to the main thread via `DispatchQueue.main.async`.
+
 ## Coordinate spaces
 
 Three coordinate spaces are in play, and getting them confused is the most
@@ -117,6 +136,23 @@ tree fine; it's specifically `click --element <id>` on such a window that
 would miss, since it clicks at the AX-reported frame's center in global
 screen coordinates. Verified working end-to-end against TextEdit (multiple
 simultaneous windows, exact frame agreement between AX and CGWindowList).
+
+Separately: uictl cannot reliably drive its **own** GUI (the activity log
+window, see "Activity log window" below) via its own `click --element`/
+`click --at`. `Accessibility.frame(of:)` against one of that window's own
+AXUIElements — a self-referential query, the daemon's background accept
+thread asking AppKit's in-process accessibility bridging about a view owned
+by that same process's main thread — intermittently or consistently returns
+no frame, and even a raw-coordinate `click --at` verified (via OCR) to land
+exactly on the "Export JSON…" button did not trigger it, across several
+repeated attempts including back-to-back double-clicks. Root cause not
+isolated (candidates: main-thread affinity of in-process AX/view state,
+something specific to an unbundled, `.accessory`-policy, `Process()`-spawned
+app's window-server session) — but this is irrelevant to uictl's actual job
+of driving *other* apps, which this session's testing exercised extensively
+(TextEdit, Chrome, Terminal, etc.) with no such issue. A real mouse click
+from a human never goes through any of uictl's code at all, so this caveat
+only affects uictl-driving-uictl, not normal use.
 
 ## App-name resolution across restarts
 

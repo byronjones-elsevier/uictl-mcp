@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 #if canImport(Darwin)
 import Darwin
@@ -5,9 +6,12 @@ import Darwin
 
 /// Accepts one Unix-domain-socket connection at a time, reads a single framed
 /// JSON request, dispatches it, writes a single framed JSON response, and closes
-/// the connection. Kept deliberately simple (no concurrency) since every command
-/// it dispatches to (Accessibility, CGEvent, ScreenCaptureKit) is happiest called
-/// serially from one process anyway.
+/// the connection. The accept/dispatch loop itself is still deliberately simple
+/// (no concurrency, one request at a time) since every command it dispatches to
+/// (Accessibility, CGEvent, ScreenCaptureKit) is happiest called serially from
+/// one process anyway — but it now runs on a background thread, freeing the main
+/// thread for an NSApplication run loop (the toast + activity-log window need
+/// one; see ActivityUI/ToastController/ActivityWindowController).
 final class DaemonServer {
     private var listenFD: Int32 = -1
 
@@ -22,6 +26,21 @@ final class DaemonServer {
 
         log("uictl daemon listening on \(UICtlPaths.socketPath) (pid \(getpid()))")
 
+        ActivityUI.install()
+
+        let acceptThread = Thread { [weak self] in self?.acceptLoop() }
+        acceptThread.name = "uictl.accept"
+        acceptThread.start()
+
+        // No Dock icon/app-switcher entry — this is a background daemon that
+        // just occasionally needs to show a couple of small windows — but a
+        // real run loop so those windows can actually pump events.
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        app.run()
+    }
+
+    private func acceptLoop() {
         while true {
             let clientFD = accept(listenFD, nil, nil)
             if clientFD < 0 {
