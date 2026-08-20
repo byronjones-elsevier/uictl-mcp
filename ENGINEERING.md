@@ -66,6 +66,24 @@ convention, confusingly the opposite of its window-position convention);
 overlay boxes — can be expressed directly in global-Quartz-style top-left/
 y-down coordinates without a second conversion.
 
+### Multiple displays
+
+Global-Quartz space is anchored to the *primary* display's top-left corner,
+not each display's own — so a display positioned left of or above the
+primary one in System Settings > Displays has **negative** x/y in its
+`CGDisplayBounds`, and any window/element frame on it will too. `uictl
+displays`/`uictl_displays` (`Core/Displays.swift`) enumerates every display's
+id, bounds, main-display flag, and points-to-pixels scale, so a caller can
+tell which display a coordinate is likely to land on before acting — its
+`"index"` field matches what `screenshot --screen <index>` expects. Every
+window from `windows`/`uictl_windows` also carries a `"displayId"` matching
+one of those ids, or `null` if its center doesn't fall within any display's
+bounds — rare, but possible for a mostly off-screen window
+(`Displays.displayID(containing:)`, a synchronous `CGGetDisplaysWithPoint`
+lookup on the window's center — deliberately not the `SCShareableContent`
+API `Displays.list()` uses, since that requires an async round trip per call
+and would be too slow to run once per window).
+
 ## Window → AXUIElement correlation
 
 There's no public API that maps a `CGWindowID` to an `AXUIElement` directly.

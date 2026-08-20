@@ -19,6 +19,9 @@ enum CommandDispatcher {
             case "apps.list":
                 return successResponse(AppsAndWindows.listApps(includeBackground: params["all"] as? Bool ?? false))
 
+            case "displays.list":
+                return successResponse(try Displays.list())
+
             case "windows.list":
                 let pids: Set<pid_t>? = try (params["app"] as? String).map { selector in
                     Set(try AppSelector.resolveAll(selector).map(\.processIdentifier))

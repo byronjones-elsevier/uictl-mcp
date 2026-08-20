@@ -22,6 +22,7 @@ struct Root: ParsableCommand {
             DaemonCommand.self,
             PermissionsCommand.self,
             AppsCommand.self,
+            DisplaysCommand.self,
             WindowsCommand.self,
             ActivateCommand.self,
             ScreenshotCommand.self,
