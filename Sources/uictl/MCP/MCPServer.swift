@@ -99,6 +99,22 @@ private let toolDefinitions: [ToolSpec] = [
                    ], required: ["app"]))
     ),
     ToolSpec(
+        command: "focus.hold",
+        tool: Tool(name: "uictl_focus_hold", description: "Pin uictl to one window so every subsequent uictl_click/uictl_move/uictl_scroll/uictl_type/uictl_key call re-activates and raises it first if it isn't already frontmost. Use this before a sequence of actions on a window that a human might click away from mid-task (e.g. clicking back into the terminal running this agent) — it counters exactly that focus steal. Call uictl_focus_release when done.",
+                   inputSchema: schema([
+                       "window": prop("integer", "Window id (from uictl_windows) to hold."),
+                       "app": prop("string", "App whose frontmost window to hold (name substring, bundle id, or pid)."),
+                   ]))
+    ),
+    ToolSpec(
+        command: "focus.release",
+        tool: Tool(name: "uictl_focus_release", description: "Stop holding focus on whatever window uictl_focus_hold last set.", inputSchema: schema([:]))
+    ),
+    ToolSpec(
+        command: "focus.status",
+        tool: Tool(name: "uictl_focus_status", description: "Show what window (if any) is currently held via uictl_focus_hold, and whether its app is currently frontmost.", inputSchema: schema([:]))
+    ),
+    ToolSpec(
         command: "screenshot",
         tool: Tool(name: "uictl_screenshot",
                    description: "Capture a window, an app's frontmost window, or a display. Set annotate=true to overlay numbered boxes on every accessibility element and get a legend back — then click/type by element number.",

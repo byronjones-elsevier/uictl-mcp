@@ -45,6 +45,15 @@ enum CommandDispatcher {
                 }
                 return successResponse(try AppsAndWindows.activate(appSelector: appSelector, windowID: params["window"] as? Int))
 
+            case "focus.hold":
+                return successResponse(try FocusHold.hold(windowID: params["window"] as? Int, appSelector: params["app"] as? String))
+
+            case "focus.release":
+                return successResponse(FocusHold.release())
+
+            case "focus.status":
+                return successResponse(FocusHold.status())
+
             case "screenshot":
                 return try runScreenshot(params)
 
@@ -52,13 +61,16 @@ enum CommandDispatcher {
                 return try runElements(params)
 
             case "click":
+                FocusHold.ensureFocused()
                 return try runClick(params)
 
             case "move":
+                FocusHold.ensureFocused()
                 try InputSynthesis.move(to: try resolvePoint(params))
                 return successResponse(["moved": true])
 
             case "scroll":
+                FocusHold.ensureFocused()
                 let point = try resolvePoint(params)
                 let dx = Int32(params["dx"] as? Int ?? 0)
                 let dy = Int32(params["dy"] as? Int ?? 0)
@@ -66,9 +78,11 @@ enum CommandDispatcher {
                 return successResponse(["scrolled": true])
 
             case "type":
+                FocusHold.ensureFocused()
                 return try runType(params)
 
             case "key":
+                FocusHold.ensureFocused()
                 guard let combo = params["combo"] as? String else { throw UICtlError.message("\"combo\" is required") }
                 try InputSynthesis.sendKeyCombo(combo)
                 return successResponse(["sent": combo])
