@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import CoreGraphics
 import ApplicationServices
@@ -90,7 +91,20 @@ enum CommandDispatcher {
                 return successResponse(try PixelSampler.colorAt(point: try resolvePoint(params)))
 
             case "log.show":
-                DispatchQueue.main.async { ActivityWindowController.shared.showWindow(nil) }
+                DispatchQueue.main.async {
+                    // `uictl activate --app uictl` (NSRunningApplication.activate
+                    // called from a different process) does not reliably work for
+                    // this daemon's own .accessory-policy process — observed
+                    // consistently failing in practice. Self-activation from
+                    // within the process, plus forcing the specific window
+                    // front regardless of key/active status, is what actually
+                    // brings it back after it's been buried by other windows
+                    // (expected: .accessory apps have no Dock/Cmd-Tab entry to
+                    // re-summon it any other way).
+                    NSApp.activate(ignoringOtherApps: true)
+                    ActivityWindowController.shared.showWindow(nil)
+                    ActivityWindowController.shared.window?.orderFrontRegardless()
+                }
                 return successResponse(["shown": true])
 
             case "log.export":

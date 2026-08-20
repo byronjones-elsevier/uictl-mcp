@@ -58,6 +58,40 @@ on the background thread while AppKit runs on the main thread, every UI
 update the GUI layer makes in response to a recorded call
 (`ActivityLog.onRecord`) hops to the main thread via `DispatchQueue.main.async`.
 
+**Re-summoning a buried window.** `.accessory` policy means no Dock icon and
+no Cmd-Tab entry, so once the log window is behind other windows, there's no
+OS-level way back to it except running `uictl log show` again. That case's
+handler therefore does more than `showWindow(nil)`: it also calls
+`NSApp.activate(ignoringOtherApps: true)` and `window?.orderFrontRegardless()`.
+Both matter — `uictl activate --app uictl` (`NSRunningApplication.activate`,
+called *from a different process*) was observed consistently failing against
+this daemon's own process specifically (every other app tested during this
+work activated fine); self-activation from *within* the process is a
+different, evidently more permitted code path. Root cause not confirmed, but
+plausibly a macOS restriction on `.accessory`/unbundled processes activating
+themselves via that external API.
+
+**Security note — sensitive on-screen content is not redacted.**
+`ActivityLog.summarizeParams`/`summarizeResponse` (`Core/ActivityLog.swift`)
+redact `"text"` for `type`/`clipboard.set`/`clipboard.get` specifically,
+since those are the one param/response shape where secret content flows
+through uictl's own arguments (a password typed into a field, clipboard
+content). They deliberately do **not** redact `ocr`/`elements`/`screenshot`
+output: those commands' entire purpose is to read whatever is genuinely on
+screen, and there's no reliable way to distinguish "just app UI" from
+"a password field someone left visible" from plain text content — attempting
+to guess would either miss real secrets or break the feature for everything
+else. Whatever is on screen when one of those commands runs — which can
+include passwords, tokens, or other sensitive text the automated app happens
+to display — ends up in the activity log (on-screen table and any
+`uictl_log_export`/`uictl log export` JSON output) and in any screenshot
+file `screenshot`/`screenshot --annotate` writes to disk. Treat the activity
+log window, its JSON exports, and saved screenshots as potentially
+containing sensitive data: don't leave the log window on-screen or its
+exports lying around on a shared or untrusted machine, and manage/dispose of
+screenshot files with the same care as any other capture of your screen's
+contents.
+
 ## Coordinate spaces
 
 Three coordinate spaces are in play, and getting them confused is the most

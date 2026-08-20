@@ -74,6 +74,13 @@ final class ActivityLog {
     /// the clipboard — that's the one param shape likely to carry something
     /// sensitive (a password typed into a field, secret clipboard content),
     /// and this log is both on-screen and exportable to a file.
+    ///
+    /// Deliberately not redacted: `ocr`/`elements`/`screenshot` output, whose
+    /// entire purpose is reading whatever's genuinely on screen — which can
+    /// include sensitive text an automated app happens to display. See the
+    /// "Security note" in ENGINEERING.md's "Activity log window" section
+    /// before treating the log window, its exports, or saved screenshots as
+    /// safe to leave lying around.
     private static func summarizeParams(command: String, params: JSONDict) -> String {
         var redacted = params
         if command == "type" || command == "clipboard.set", let text = redacted["text"] as? String {

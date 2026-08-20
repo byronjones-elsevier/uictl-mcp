@@ -17,7 +17,7 @@ final class ToastController {
         if panel == nil { makePanel() }
         guard let panel, let label else { return }
 
-        label.stringValue = "\(entry.ok ? "🔴" : "⚠️") uictl: \(entry.command)"
+        label.stringValue = "\(entry.ok ? "🟢" : "🔴") uictl: \(entry.command)"
         panel.layoutIfNeeded()
         positionNearMouse(panel)
         panel.alphaValue = 1
@@ -63,11 +63,19 @@ final class ToastController {
         self.label = label
     }
 
+    /// Positions just above and to the right of the cursor, clamped to the
+    /// bounds of whichever screen the cursor is actually on, so it neither
+    /// drifts to a fixed corner nor spills off the edge of that display.
     private func positionNearMouse(_ panel: NSPanel) {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
         guard let visibleFrame = screen?.visibleFrame else { return }
-        let origin = NSPoint(x: visibleFrame.maxX - panel.frame.width - 20, y: visibleFrame.maxY - panel.frame.height - 20)
+
+        let preferred = NSPoint(x: mouseLocation.x + 16, y: mouseLocation.y + 16)
+        let origin = NSPoint(
+            x: min(max(preferred.x, visibleFrame.minX), visibleFrame.maxX - panel.frame.width),
+            y: min(max(preferred.y, visibleFrame.minY), visibleFrame.maxY - panel.frame.height)
+        )
         panel.setFrameOrigin(origin)
     }
 

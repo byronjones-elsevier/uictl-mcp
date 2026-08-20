@@ -8,7 +8,14 @@ struct LogCommand: ParsableCommand {
     )
 
     struct Show: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Open the on-screen activity log window.")
+        static let configuration = CommandConfiguration(
+            abstract: "Open the on-screen activity log window.",
+            discussion: """
+            The daemon runs as a background (.accessory) app with no Dock icon \
+            and no Cmd-Tab entry, so if this window gets buried under others, \
+            Cmd-Tab won't bring it back — run this again instead.
+            """
+        )
 
         func run() throws {
             emit(DaemonClient.send(command: "log.show", params: [:]))

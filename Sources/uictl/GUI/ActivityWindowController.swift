@@ -3,9 +3,11 @@ import UniformTypeIdentifiers
 
 /// The on-screen window opened by `uictl log show`: a live "active/idle"
 /// banner plus a scrollable table of every call the daemon has handled, with
-/// a button to export the full log as JSON. Reused across repeated `log
-/// show` calls rather than recreated. All methods must be called on the main
-/// thread.
+/// a button to export the log as JSON — the same summarized/truncated/
+/// redacted params and response text shown in the table, via
+/// `ActivityLog.exportJSON` (see its doc comment for exactly what that
+/// means). Reused across repeated `log show` calls rather than recreated.
+/// All methods must be called on the main thread.
 final class ActivityWindowController: NSWindowController {
     static let shared = ActivityWindowController()
 
@@ -122,6 +124,8 @@ final class ActivityWindowController: NSWindowController {
     }
 
     private func showPopover(text: String, anchor: NSView) {
+        activePopover?.close()
+
         let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 420, height: 240))
         textView.string = text
         textView.isEditable = false
@@ -188,15 +192,17 @@ extension ActivityWindowController: NSTableViewDataSource, NSTableViewDelegate {
                 button.font = .systemFont(ofSize: 11)
                 button.contentTintColor = .labelColor
                 (button.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
+
+                let menu = NSMenu()
+                let copyItem = NSMenuItem(title: "Copy", action: #selector(copyExpandableCell(_:)), keyEquivalent: "")
+                copyItem.target = self
+                menu.addItem(copyItem)
+                button.menu = menu
             }
             button.title = text
-
-            let menu = NSMenu()
-            let copyItem = NSMenuItem(title: "Copy", action: #selector(copyExpandableCell(_:)), keyEquivalent: "")
-            copyItem.target = self
-            copyItem.representedObject = text
-            menu.addItem(copyItem)
-            button.menu = menu
+            // The menu is built once above; only its representedObject (the
+            // text to copy) needs refreshing on every reuse.
+            button.menu?.items.first?.representedObject = text
 
             return button
         }
