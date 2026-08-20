@@ -129,7 +129,13 @@ enum CommandDispatcher {
 
             case "feedback.update":
                 guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
-                let category = (params["category"] as? String).flatMap(FeedbackCategory.init(rawValue:))
+                var category: FeedbackCategory?
+                if let categoryRaw = params["category"] as? String {
+                    guard let parsed = FeedbackCategory(rawValue: categoryRaw) else {
+                        throw UICtlError.message("\"category\" must be one of: issue, error, recommendation")
+                    }
+                    category = parsed
+                }
                 let updated = try FeedbackStore.update(id: id, category: category, title: params["title"] as? String, body: params["body"] as? String)
                 return successResponse(updated.jsonDict)
 

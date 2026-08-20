@@ -68,7 +68,7 @@ enum FeedbackSubmission {
             }
 
             guard review.action == .accept else {
-                return successResult(["submitted": false, "reason": "review \(review.action.rawValue)d"])
+                return successResult(["submitted": false, "reason": "review \(reviewOutcomeDescription(review.action))"])
             }
             if let editedTitle = review.content?["title"]?.stringValue, !editedTitle.isEmpty { title = editedTitle }
             if let editedBody = review.content?["body"]?.stringValue, !editedBody.isEmpty { body = editedBody }
@@ -127,6 +127,16 @@ enum FeedbackSubmission {
     private static func errorResult(_ message: String) -> CallTool.Result {
         .init(content: [.text(text: jsonString(errorResponse(message)), annotations: nil, _meta: nil)], isError: true)
     }
+
+    /// `action.rawValue` + "d" reads fine for "declined" but produces
+    /// "canceld" for `.cancel` — spell each outcome out properly instead.
+    private static func reviewOutcomeDescription(_ action: CreateElicitation.Result.Action) -> String {
+        switch action {
+        case .accept: return "accepted"
+        case .decline: return "declined"
+        case .cancel: return "cancelled"
+        }
+    }
 }
 
 private struct TimeoutError: Error, CustomStringConvertible {
@@ -168,7 +178,7 @@ private func withTimeout<T: Sendable>(seconds: Double, operation: @escaping @Sen
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
         let once = ResumeOnce(continuation)
 
-        Task {
+        let operationTask = Task {
             do {
                 once.resume(with: .success(try await operation()))
             } catch {
@@ -179,6 +189,11 @@ private func withTimeout<T: Sendable>(seconds: Double, operation: @escaping @Sen
         Task {
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             once.resume(with: .failure(TimeoutError()))
+            // Best-effort: the SDK's continuation-based wait may not check
+            // for cancellation, but asking costs nothing, and it's the
+            // difference between "leaked for the life of the process" and
+            // "cleaned up" for any operation that does.
+            operationTask.cancel()
         }
     }
 }

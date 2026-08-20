@@ -140,7 +140,11 @@ enum FeedbackStore {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(contents)
-        try data.write(to: URL(fileURLWithPath: UICtlPaths.feedbackFilePath))
+        // .atomic writes to a temp file and renames it into place, so a
+        // crash or kill mid-write can't leave a half-written, corrupt
+        // feedback.json — the file is either the old contents or the new
+        // ones, never a partial mix of both.
+        try data.write(to: URL(fileURLWithPath: UICtlPaths.feedbackFilePath), options: .atomic)
     }
 }
 
