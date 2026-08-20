@@ -117,10 +117,12 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "click",
-        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error. Restores the cursor to its pre-click position afterward unless hoverCursor is set.",
+        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error. Restores the cursor to its pre-click position afterward unless hoverCursor is set. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
                    inputSchema: schema([
-                       "at": prop("string", "\"x,y\" screen point."),
+                       "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
                        "element": prop("string", "Element id."),
+                       "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
+                       "app": prop("string", "App whose frontmost window at is relative to."),
                        "button": prop("string", "left | right | center"),
                        "double": prop("boolean", "Double-click."),
                        "count": prop("integer", "Click count (e.g. 3 for triple-click)."),
@@ -129,14 +131,20 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "move",
-        tool: Tool(name: "uictl_move", description: "Move the mouse cursor without clicking.",
-                   inputSchema: schema(["at": prop("string", "\"x,y\" screen point.")], required: ["at"]))
+        tool: Tool(name: "uictl_move", description: "Move the mouse cursor without clicking. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
+                   inputSchema: schema([
+                       "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
+                       "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
+                       "app": prop("string", "App whose frontmost window at is relative to."),
+                   ], required: ["at"]))
     ),
     ToolSpec(
         command: "scroll",
-        tool: Tool(name: "uictl_scroll", description: "Scroll at a screen point.",
+        tool: Tool(name: "uictl_scroll", description: "Scroll at a screen point. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
                    inputSchema: schema([
-                       "at": prop("string", "\"x,y\" screen point."),
+                       "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
+                       "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
+                       "app": prop("string", "App whose frontmost window at is relative to."),
                        "dx": prop("integer", "Horizontal delta (positive scrolls left)."),
                        "dy": prop("integer", "Vertical delta (positive scrolls up)."),
                    ], required: ["at"]))
@@ -178,8 +186,12 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "pixel",
-        tool: Tool(name: "uictl_pixel", description: "Sample the color of a single screen pixel.",
-                   inputSchema: schema(["at": prop("string", "\"x,y\" screen point.")], required: ["at"]))
+        tool: Tool(name: "uictl_pixel", description: "Sample the color of a single screen pixel. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
+                   inputSchema: schema([
+                       "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
+                       "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
+                       "app": prop("string", "App whose frontmost window at is relative to."),
+                   ], required: ["at"]))
     ),
     ToolSpec(
         command: "clipboard.get",
