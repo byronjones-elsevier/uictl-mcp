@@ -84,6 +84,20 @@ lookup on the window's center — deliberately not the `SCShareableContent`
 API `Displays.list()` uses, since that requires an async round trip per call
 and would be too slow to run once per window).
 
+### Window-relative coordinates
+
+`click`/`move`/`scroll`/`pixel` all take `"at"` as a global-Quartz point by
+default. Passing `window` (a window id) or `app` (an app selector) alongside
+`"at"` switches it to a window-relative point instead:
+`CommandDispatcher.resolvePoint` re-resolves that window's *current* frame
+via `WindowResolver.resolve` at call time — not from a cached/stale
+screenshot — and adds `"at"` to `frame.origin`, i.e. the window's top-left
+corner in the same global-Quartz, top-left/y-down space described above (if
+both `window` and `app` are given, `window` wins). This is both a
+multi-display convenience (no manual arithmetic against `uictl displays`'
+bounds) and more
+robust to the window having moved since it was last located.
+
 ## Window → AXUIElement correlation
 
 There's no public API that maps a `CGWindowID` to an `AXUIElement` directly.

@@ -3,11 +3,17 @@ import ArgumentParser
 struct ClickCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "click", abstract: "Click at a screen point or on a specific element.")
 
-    @Option(help: "Screen point to click: \"x,y\".")
+    @Option(help: "Screen point to click: \"x,y\". Relative to --window/--app's top-left corner if either is given, otherwise an absolute global-screen point.")
     var at: String?
 
     @Option(help: "Element id (from `elements` or `screenshot --annotate`) to click the center of.")
     var element: String?
+
+    @Option(help: "Treat --at as relative to this window's current top-left corner (from `windows`) instead of an absolute screen point.")
+    var window: Int?
+
+    @Option(help: "Treat --at as relative to this app's frontmost window's current top-left corner instead of an absolute screen point.")
+    var app: String?
 
     @Option(help: "Mouse button.")
     var button: String = "left"
@@ -25,6 +31,8 @@ struct ClickCommand: ParsableCommand {
         var params: JSONDict = ["button": button, "double": double, "hoverCursor": hoverCursor]
         if let at { params["at"] = at }
         if let element { params["element"] = element }
+        if let window { params["window"] = window }
+        if let app { params["app"] = app }
         if let count { params["count"] = count }
         emit(DaemonClient.send(command: "click", params: params))
     }
@@ -33,19 +41,34 @@ struct ClickCommand: ParsableCommand {
 struct MoveCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "move", abstract: "Move the mouse cursor without clicking (e.g. to trigger hover states).")
 
-    @Option(help: "Screen point to move to: \"x,y\".")
+    @Option(help: "Screen point to move to: \"x,y\". Relative to --window/--app's top-left corner if either is given, otherwise an absolute global-screen point.")
     var at: String
 
+    @Option(help: "Treat --at as relative to this window's current top-left corner (from `windows`) instead of an absolute screen point.")
+    var window: Int?
+
+    @Option(help: "Treat --at as relative to this app's frontmost window's current top-left corner instead of an absolute screen point.")
+    var app: String?
+
     func run() throws {
-        emit(DaemonClient.send(command: "move", params: ["at": at]))
+        var params: JSONDict = ["at": at]
+        if let window { params["window"] = window }
+        if let app { params["app"] = app }
+        emit(DaemonClient.send(command: "move", params: params))
     }
 }
 
 struct ScrollCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "scroll", abstract: "Scroll at a screen point.")
 
-    @Option(help: "Screen point to scroll at: \"x,y\".")
+    @Option(help: "Screen point to scroll at: \"x,y\". Relative to --window/--app's top-left corner if either is given, otherwise an absolute global-screen point.")
     var at: String
+
+    @Option(help: "Treat --at as relative to this window's current top-left corner (from `windows`) instead of an absolute screen point.")
+    var window: Int?
+
+    @Option(help: "Treat --at as relative to this app's frontmost window's current top-left corner instead of an absolute screen point.")
+    var app: String?
 
     @Option(help: "Vertical scroll delta in pixels (positive scrolls up).")
     var dy: Int = 0
@@ -54,7 +77,10 @@ struct ScrollCommand: ParsableCommand {
     var dx: Int = 0
 
     func run() throws {
-        emit(DaemonClient.send(command: "scroll", params: ["at": at, "dx": dx, "dy": dy]))
+        var params: JSONDict = ["at": at, "dx": dx, "dy": dy]
+        if let window { params["window"] = window }
+        if let app { params["app"] = app }
+        emit(DaemonClient.send(command: "scroll", params: params))
     }
 }
 

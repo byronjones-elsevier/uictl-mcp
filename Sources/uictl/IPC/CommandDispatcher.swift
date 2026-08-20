@@ -44,13 +44,11 @@ enum CommandDispatcher {
                 return try runClick(params)
 
             case "move":
-                guard let atText = params["at"] as? String else { throw UICtlError.message("\"at\" is required") }
-                try InputSynthesis.move(to: try parsePoint(atText))
+                try InputSynthesis.move(to: try resolvePoint(params))
                 return successResponse(["moved": true])
 
             case "scroll":
-                guard let atText = params["at"] as? String else { throw UICtlError.message("\"at\" is required") }
-                let point = try parsePoint(atText)
+                let point = try resolvePoint(params)
                 let dx = Int32(params["dx"] as? Int ?? 0)
                 let dy = Int32(params["dy"] as? Int ?? 0)
                 try InputSynthesis.scroll(at: point, dx: dx, dy: dy)
@@ -79,8 +77,7 @@ enum CommandDispatcher {
                 return successResponse(["set": true])
 
             case "pixel":
-                guard let atText = params["at"] as? String else { throw UICtlError.message("\"at\" is required") }
-                return successResponse(try PixelSampler.colorAt(point: try parsePoint(atText)))
+                return successResponse(try PixelSampler.colorAt(point: try resolvePoint(params)))
 
             default:
                 return errorResponse("unknown command \"\(command)\"")
@@ -162,6 +159,9 @@ enum CommandDispatcher {
         var axElement: AXUIElement?
 
         if let elementID = params["element"] as? String {
+            guard params["window"] == nil, params["app"] == nil else {
+                throw UICtlError.message("\"window\"/\"app\" have no effect when \"element\" is set (the element's own position is used); omit them")
+            }
             let element = try Accessibility.lookupElement(elementID: elementID)
             guard let elementFrame = Accessibility.frame(of: element) else {
                 throw UICtlError.message("element \"\(elementID)\" no longer has a frame")
@@ -172,8 +172,8 @@ enum CommandDispatcher {
             }
             axElement = element
             point = elementFrame.center
-        } else if let atText = params["at"] as? String {
-            point = try parsePoint(atText)
+        } else if params["at"] != nil {
+            point = try resolvePoint(params)
         } else {
             throw UICtlError.message("either \"at\" or \"element\" is required")
         }
@@ -258,6 +258,26 @@ enum CommandDispatcher {
         let capture = try ScreenCapture.captureWindow(windowID: resolved.windowID)
         let results = try OCR.recognizeText(in: capture.image, region: region, imageOrigin: capture.origin, scale: capture.pointPixelScale)
         return successResponse(["textBlocks": results])
+    }
+
+    // MARK: - Point resolution
+
+    /// Parses `"at"` ("x,y", required), and if `"window"`/`"app"` is also
+    /// given, translates it against that window's *current* frame — resolved
+    /// fresh here, not from a possibly-stale screenshot — instead of treating
+    /// it as an absolute global-Quartz point. Without `"window"`/`"app"`,
+    /// behavior is unchanged: a pure global point. If both `"window"` and
+    /// `"app"` are given, `"window"` wins (same precedence as
+    /// `WindowResolver.resolve` already applies elsewhere).
+    private static func resolvePoint(_ params: JSONDict) throws -> CGPoint {
+        guard let atValue = params["at"] else { throw UICtlError.message("\"at\" is required") }
+        guard let atText = atValue as? String else { throw UICtlError.message("\"at\" must be a string \"x,y\"") }
+        let point = try parsePoint(atText)
+
+        guard params["window"] != nil || params["app"] != nil else { return point }
+
+        let resolved = try WindowResolver.resolve(windowID: params["window"] as? Int, appSelector: params["app"] as? String)
+        return CGPoint(x: resolved.frame.origin.x + point.x, y: resolved.frame.origin.y + point.y)
     }
 }
 

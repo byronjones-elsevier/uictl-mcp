@@ -106,10 +106,19 @@ struct OCRCommand: ParsableCommand {
 struct PixelCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "pixel", abstract: "Sample the color of a single screen pixel.")
 
-    @Option(help: "Screen point to sample: \"x,y\".")
+    @Option(help: "Screen point to sample: \"x,y\". Relative to --window/--app's top-left corner if either is given, otherwise an absolute global-screen point.")
     var at: String
 
+    @Option(help: "Treat --at as relative to this window's current top-left corner (from `windows`) instead of an absolute screen point.")
+    var window: Int?
+
+    @Option(help: "Treat --at as relative to this app's frontmost window's current top-left corner instead of an absolute screen point.")
+    var app: String?
+
     func run() throws {
-        emit(DaemonClient.send(command: "pixel", params: ["at": at]))
+        var params: JSONDict = ["at": at]
+        if let window { params["window"] = window }
+        if let app { params["app"] = app }
+        emit(DaemonClient.send(command: "pixel", params: params))
     }
 }
