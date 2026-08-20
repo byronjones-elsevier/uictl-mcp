@@ -20,6 +20,15 @@ enum MCPServer {
 
         await server.withMethodHandler(CallTool.self) { params in
             let args = params.arguments?.mapValues(anyFromValue) ?? [:]
+
+            // The one capability that can't be a thin forward to the daemon:
+            // elicitation requires the live `Server` connected to *this*
+            // MCP client, which the daemon (talking only to a Unix socket)
+            // has no access to. See FeedbackSubmission.swift.
+            if params.name == "uictl_feedback_submit" {
+                return await FeedbackSubmission.handle(server: server, args: args)
+            }
+
             guard let spec = toolDefinitions.first(where: { $0.tool.name == params.name }) else {
                 return .init(content: [.text(text: jsonString(errorResponse("unknown tool \(params.name)")), annotations: nil, _meta: nil)], isError: true)
             }
@@ -215,5 +224,56 @@ private let toolDefinitions: [ToolSpec] = [
     ToolSpec(
         command: "permissions.status",
         tool: Tool(name: "uictl_permissions", description: "Check Accessibility and Screen Recording permission status.", inputSchema: schema([:]))
+    ),
+    ToolSpec(
+        command: "feedback.create",
+        tool: Tool(name: "uictl_feedback_create", description: "Draft a new local feedback entry (an issue, error, or recommendation about uictl itself) — stored locally, not sent anywhere. Use uictl_feedback_submit to send it to GitHub.",
+                   inputSchema: schema([
+                       "category": prop("string", "One of: issue, error, recommendation."),
+                       "title": prop("string", "Short summary — becomes the GitHub issue title."),
+                       "body": prop("string", "Full description — becomes the GitHub issue body."),
+                   ], required: ["category", "title", "body"]))
+    ),
+    ToolSpec(
+        command: "feedback.list",
+        tool: Tool(name: "uictl_feedback_list", description: "List all local feedback entries (drafts and previously submitted).", inputSchema: schema([:]))
+    ),
+    ToolSpec(
+        command: "feedback.get",
+        tool: Tool(name: "uictl_feedback_get", description: "Show one local feedback entry in full.",
+                   inputSchema: schema(["id": prop("integer", "Feedback entry id (from uictl_feedback_list).")], required: ["id"]))
+    ),
+    ToolSpec(
+        command: "feedback.update",
+        tool: Tool(name: "uictl_feedback_update", description: "Edit a local feedback entry.",
+                   inputSchema: schema([
+                       "id": prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                       "category": prop("string", "One of: issue, error, recommendation."),
+                       "title": prop("string", "New title."),
+                       "body": prop("string", "New body."),
+                   ], required: ["id"]))
+    ),
+    ToolSpec(
+        command: "feedback.delete",
+        tool: Tool(name: "uictl_feedback_delete", description: "Delete a local feedback entry.",
+                   inputSchema: schema(["id": prop("integer", "Feedback entry id (from uictl_feedback_list).")], required: ["id"]))
+    ),
+    ToolSpec(
+        command: "feedback.checkDuplicates",
+        tool: Tool(name: "uictl_feedback_check_duplicates", description: "Check a local feedback entry's title against existing GitHub issues (open and closed), without submitting anything. Needs a token if the repo is private (pass \"token\", set $GITHUB_TOKEN, or have `gh` already authenticated) — otherwise reports checked:false rather than blocking. uictl_feedback_submit runs this same check automatically before opening anything.",
+                   inputSchema: schema([
+                       "id": prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                       "repo": prop("string", "GitHub repo to check against, as \"owner/repo\". Defaults to uictl's own repo."),
+                       "token": prop("string", "GitHub token, if the repo needs one."),
+                   ], required: ["id"]))
+    ),
+    ToolSpec(
+        command: "feedback.submit",
+        tool: Tool(name: "uictl_feedback_submit", description: "Send a local feedback entry to GitHub Issues by opening a pre-filled \"new issue\" page — it does not create the issue itself, a human still reviews and clicks \"Create\" there. First checks the entry's title against existing GitHub issues (see uictl_feedback_check_duplicates); if a likely duplicate is found, the local entry is deleted and nothing is opened or elicited. Otherwise, since this is you (an agent) initiating something outward-facing on the human's behalf, this asks the human to review (and optionally edit) the content via MCP elicitation first, then hands off the pre-filled URL via a second, URL-mode elicitation. If the connected client doesn't support elicitation, it falls back to opening the URL directly on this machine.",
+                   inputSchema: schema([
+                       "id": prop("integer", "Feedback entry id (from uictl_feedback_list)."),
+                       "repo": prop("string", "GitHub repo to submit to, as \"owner/repo\". Defaults to uictl's own repo."),
+                       "token": prop("string", "GitHub token, for the duplicate check against a private repo."),
+                   ], required: ["id"]))
     ),
 ]

@@ -112,6 +112,101 @@ enum CommandDispatcher {
                 try ActivityLog.shared.exportJSON(to: path)
                 return successResponse(["path": path])
 
+            case "feedback.create":
+                guard let categoryRaw = params["category"] as? String, let category = FeedbackCategory(rawValue: categoryRaw) else {
+                    throw UICtlError.message("\"category\" must be one of: issue, error, recommendation")
+                }
+                guard let title = params["title"] as? String else { throw UICtlError.message("\"title\" is required") }
+                guard let body = params["body"] as? String else { throw UICtlError.message("\"body\" is required") }
+                return successResponse(try FeedbackStore.create(category: category, title: title, body: body).jsonDict)
+
+            case "feedback.list":
+                return successResponse(try FeedbackStore.list().map(\.jsonDict))
+
+            case "feedback.get":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                return successResponse(try FeedbackStore.get(id: id).jsonDict)
+
+            case "feedback.update":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                var category: FeedbackCategory?
+                if let categoryRaw = params["category"] as? String {
+                    guard let parsed = FeedbackCategory(rawValue: categoryRaw) else {
+                        throw UICtlError.message("\"category\" must be one of: issue, error, recommendation")
+                    }
+                    category = parsed
+                }
+                let updated = try FeedbackStore.update(id: id, category: category, title: params["title"] as? String, body: params["body"] as? String)
+                return successResponse(updated.jsonDict)
+
+            case "feedback.delete":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                try FeedbackStore.delete(id: id)
+                return successResponse(["deleted": id])
+
+            case "feedback.buildUrl":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                let repo = (params["repo"] as? String) ?? defaultFeedbackRepo
+                let entry = try FeedbackStore.get(id: id)
+                let url = try FeedbackStore.submissionURL(for: entry, repo: repo)
+                return successResponse(["url": url.absoluteString])
+
+            case "feedback.markSubmitted":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                guard let url = params["url"] as? String else { throw UICtlError.message("\"url\" is required") }
+                return successResponse(try FeedbackStore.markSubmitted(id: id, url: url).jsonDict)
+
+            case "feedback.checkDuplicates":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                let repo = (params["repo"] as? String) ?? defaultFeedbackRepo
+                let entry = try FeedbackStore.get(id: id)
+                let token = GitHubToken.resolve(explicit: params["token"] as? String)
+                do {
+                    let issues = try GitHubIssues.fetchAll(repo: repo, token: token)
+                    let duplicates = GitHubIssues.findDuplicates(title: entry.title, in: issues)
+                    return successResponse([
+                        "checked": true,
+                        "usedToken": token != nil,
+                        "duplicates": duplicates.map { ["number": $0.number, "title": $0.title, "url": $0.url, "state": $0.state] },
+                    ])
+                } catch let error as GitHubIssuesError {
+                    return successResponse(["checked": false, "reason": error.description, "duplicates": []])
+                }
+
+            case "feedback.submit":
+                guard let id = params["id"] as? Int else { throw UICtlError.message("\"id\" is required") }
+                let repo = (params["repo"] as? String) ?? defaultFeedbackRepo
+                let entry = try FeedbackStore.get(id: id)
+                let token = GitHubToken.resolve(explicit: params["token"] as? String)
+
+                // Check for an existing GitHub issue before opening anything —
+                // a match means this draft is a re-report, not new feedback,
+                // so it's discarded locally rather than submitted. If the
+                // check itself can't run (no token against a private repo,
+                // network error, ...), that's not treated as a failure —
+                // submission just proceeds without it.
+                var duplicateCheckNote = "not attempted"
+                do {
+                    let issues = try GitHubIssues.fetchAll(repo: repo, token: token)
+                    duplicateCheckNote = "ok, no duplicate found"
+                    if let duplicate = GitHubIssues.findDuplicates(title: entry.title, in: issues).first {
+                        try FeedbackStore.delete(id: id)
+                        return successResponse([
+                            "submitted": false,
+                            "duplicate": true,
+                            "deletedLocally": true,
+                            "matchedIssue": ["number": duplicate.number, "title": duplicate.title, "url": duplicate.url, "state": duplicate.state],
+                        ])
+                    }
+                } catch let error as GitHubIssuesError {
+                    duplicateCheckNote = "skipped: \(error.description)"
+                }
+
+                let url = try FeedbackStore.submissionURL(for: entry, repo: repo)
+                NSWorkspace.shared.open(url)
+                let updated = try FeedbackStore.markSubmitted(id: id, url: url.absoluteString)
+                return successResponse(["url": url.absoluteString, "opened": true, "duplicateCheck": duplicateCheckNote, "entry": updated.jsonDict])
+
             default:
                 return errorResponse("unknown command \"\(command)\"")
             }
@@ -174,6 +269,11 @@ enum CommandDispatcher {
         let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         return UICtlPaths.homeDir + "/exports/uictl-activity-\(stamp).json"
     }
+
+    /// uictl's own issue tracker — where `feedback submit` sends things by
+    /// default. Override with `--repo owner/repo` if this ever needs to
+    /// point somewhere else (a fork, a private mirror, etc.).
+    private static let defaultFeedbackRepo = "byronjones-elsevier/uictl-mcp"
 
     // MARK: - Elements
 

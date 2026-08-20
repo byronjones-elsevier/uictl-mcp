@@ -31,6 +31,14 @@ click/type into it without a human at the keyboard.
 - **Activity log** — an on-screen toast per call plus a live log window
   (`uictl log show`) so whoever's at the machine can see what's being
   automated, and an audit trail exportable as JSON (`uictl log export`).
+- **Feedback** — draft issues/errors/recommendations about uictl itself
+  locally (full CRUD, `uictl feedback ...`), check a draft's title against
+  existing GitHub issues first to avoid re-reporting something already
+  filed, then hand it off to GitHub by opening a pre-filled "new issue"
+  page (`uictl feedback submit`) — a human still reviews and clicks
+  "Create" there. Called from MCP, `uictl_feedback_submit` asks the human
+  to review the content via MCP elicitation first, since an agent may be
+  the one initiating it.
 - **MCP server** — every capability above is also exposed as an MCP tool
   over stdio, so an MCP-aware client can call `uictl_screenshot`,
   `uictl_click`, etc. directly instead of shelling out and parsing JSON.
@@ -102,6 +110,8 @@ uictl pixel --at 100,200                     # sample a pixel's color
 uictl clipboard get / set "text"
 uictl log show                               # open the live activity log window
 uictl log export                             # export it as JSON
+uictl feedback create --category issue --title "..." --body "..."
+uictl feedback submit <id>                   # checks for duplicates, then opens a pre-filled GitHub issue
 uictl daemon status / stop
 ```
 
@@ -143,11 +153,12 @@ claude mcp get uictl     # shows the exact command it's running
 }
 ```
 
-Either way, it registers 19 `uictl_*` tools (screenshot, elements, click,
-type, displays, log_show, log_export, etc.) that a client can call directly
-with structured arguments instead of shelling out to the CLI and parsing
-stdout. Since it's the same daemon underneath either front end, permissions
-granted via the CLI (or vice versa) carry over automatically.
+Either way, it registers 26 `uictl_*` tools (screenshot, elements, click,
+type, displays, log_show, log_export, feedback_create, feedback_submit,
+etc.) that a client can call directly with structured arguments instead of
+shelling out to the CLI and parsing stdout. Since it's the same daemon
+underneath either front end, permissions granted via the CLI (or vice
+versa) carry over automatically.
 
 ## Recommended agent workflow
 
@@ -186,6 +197,13 @@ See `AGENTS.md` for a more detailed walkthrough and gotchas.
 - The daemon runs with no Dock icon and no Cmd-Tab entry (it's a background
   `.accessory` app), so if the activity log window gets buried behind other
   windows, Cmd-Tab won't bring it back — run `uictl log show` again instead.
+- **`feedback submit`'s duplicate check needs a GitHub token for a private
+  repo** — it resolves one from `--token`, then `$GITHUB_TOKEN`, then `gh
+  auth token` if `gh` is installed and already authenticated. If none of
+  those pan out, the check is skipped (reported as such) rather than
+  blocking submission — it's a courtesy, not a guarantee. The match itself
+  is a simple case-insensitive title comparison, not fuzzy matching, so it
+  won't catch a duplicate that's worded very differently.
 
 ## Security note
 
