@@ -27,6 +27,9 @@ MCP tool call  ───┘
 - **Core** (`Sources/uictl/Core/*`): the actual macOS API calls — AppKit,
   ApplicationServices (Accessibility), CoreGraphics (CGEvent input
   synthesis), ScreenCaptureKit (capture), Vision (OCR), NSPasteboard.
+- **GUI** (`Sources/uictl/GUI/*`): the daemon's own on-screen UI — a
+  per-call toast and the `uictl log show` activity-log window. See
+  "Activity log window" below.
 
 ## Why a daemon at all
 
@@ -148,8 +151,8 @@ screenshot — and adds `"at"` to `frame.origin`, i.e. the window's top-left
 corner in the same global-Quartz, top-left/y-down space described above (if
 both `window` and `app` are given, `window` wins). This is both a
 multi-display convenience (no manual arithmetic against `uictl displays`'
-bounds) and more
-robust to the window having moved since it was last located.
+bounds) and more robust to the window having moved since it was last
+located.
 
 ## Window → AXUIElement correlation
 
