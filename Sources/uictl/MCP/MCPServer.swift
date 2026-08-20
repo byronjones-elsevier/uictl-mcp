@@ -72,8 +72,13 @@ private let toolDefinitions: [ToolSpec] = [
                    inputSchema: schema(["all": prop("boolean", "Include background/agent apps.")]))
     ),
     ToolSpec(
+        command: "displays.list",
+        tool: Tool(name: "uictl_displays", description: "List connected displays: id, global-coordinate bounds, whether it's the main display, and points-to-pixels scale. All \"frame\" coordinates this tool reports are anchored to the primary display's top-left corner, so a display positioned left of or above it has negative x/y here — check this before reasoning about coordinates that might land on a non-primary display.",
+                   inputSchema: schema([:]))
+    ),
+    ToolSpec(
         command: "windows.list",
-        tool: Tool(name: "uictl_windows", description: "List on-screen windows, optionally filtered to an app. A name substring matches every running instance whose name contains it (e.g. across an app restart, both the old and new process), and windows from all of them are returned.",
+        tool: Tool(name: "uictl_windows", description: "List on-screen windows, optionally filtered to an app. A name substring matches every running instance whose name contains it (e.g. across an app restart, both the old and new process), and windows from all of them are returned. Each window includes a \"displayId\" matching one from uictl_displays.",
                    inputSchema: schema(["app": prop("string", "Name substring, bundle id, or pid.")]))
     ),
     ToolSpec(

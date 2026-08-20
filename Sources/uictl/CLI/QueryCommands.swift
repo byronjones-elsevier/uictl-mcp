@@ -25,6 +25,26 @@ struct AppsCommand: ParsableCommand {
     }
 }
 
+struct DisplaysCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "displays",
+        abstract: "List connected displays and their global-coordinate bounds.",
+        discussion: """
+        Every "frame" this tool prints (windows, elements, screenshots) is in \
+        global-Quartz coordinates, anchored to the *primary* display's \
+        top-left corner — so a display positioned left of or above the \
+        primary one in System Settings > Displays has negative x/y in its \
+        bounds. Use this command to see that topology before reasoning about \
+        coordinates on a non-primary display. The "index" field matches the \
+        index `screenshot --screen <index>` expects.
+        """
+    )
+
+    func run() throws {
+        emit(DaemonClient.send(command: "displays.list", params: [:]))
+    }
+}
+
 struct WindowsCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "windows", abstract: "List on-screen windows, optionally filtered to one app.")
 

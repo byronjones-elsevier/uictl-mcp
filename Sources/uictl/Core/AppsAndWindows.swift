@@ -46,7 +46,7 @@ enum AppsAndWindows {
             let layer = entry[kCGWindowLayer as String] as? Int ?? 0
             let isOnscreen = entry[kCGWindowIsOnscreen as String] as? Bool ?? true
 
-            return [
+            var dict: JSONDict = [
                 "windowId": windowID,
                 "pid": ownerPID,
                 "app": ownerName,
@@ -55,6 +55,10 @@ enum AppsAndWindows {
                 "isOnscreen": isOnscreen,
                 "frame": bounds.jsonDict,
             ]
+            if let displayID = Displays.displayID(containing: CGPoint(x: bounds.midX, y: bounds.midY)) {
+                dict["displayId"] = Int(displayID)
+            }
+            return dict
         }
     }
 
