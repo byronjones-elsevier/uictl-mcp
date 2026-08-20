@@ -30,10 +30,10 @@ enum Displays {
     /// enough to call once per window in `AppsAndWindows.listWindows`,
     /// unlike the `SCShareableContent.current` round trip `list()` uses.
     static func displayID(containing point: CGPoint) -> CGDirectDisplayID? {
-        var displays = [CGDirectDisplayID](repeating: 0, count: 16)
+        var display: CGDirectDisplayID = 0
         var count: UInt32 = 0
-        let result = CGGetDisplaysWithPoint(point, UInt32(displays.count), &displays, &count)
+        let result = CGGetDisplaysWithPoint(point, 1, &display, &count)
         guard result == .success, count > 0 else { return nil }
-        return displays[0]
+        return display
     }
 }

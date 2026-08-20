@@ -78,7 +78,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "windows.list",
-        tool: Tool(name: "uictl_windows", description: "List on-screen windows, optionally filtered to an app. A name substring matches every running instance whose name contains it (e.g. across an app restart, both the old and new process), and windows from all of them are returned. Each window includes a \"displayId\" matching one from uictl_displays.",
+        tool: Tool(name: "uictl_windows", description: "List on-screen windows, optionally filtered to an app. A name substring matches every running instance whose name contains it (e.g. across an app restart, both the old and new process), and windows from all of them are returned. Each window includes a \"displayId\" matching one from uictl_displays, or null if its center doesn't fall within any display's bounds (rare — e.g. a mostly off-screen window).",
                    inputSchema: schema(["app": prop("string", "Name substring, bundle id, or pid.")]))
     ),
     ToolSpec(
