@@ -105,6 +105,12 @@ since closed, focus-sensitive actions just proceed without re-focusing
 rather than failing outright — release and re-hold once you've picked a new
 target.
 
+Every focus-sensitive command's response also carries a `focusHold` field
+while a hold is active — `"alreadyFrontmost"`, `"reactivated"`, or
+`"failed"`. Check it rather than assuming the action landed where you
+aimed: a `"failed"` result means the click/type/key that just ran may well
+have gone to the wrong window (e.g. the held app has quit).
+
 ## When accessibility elements aren't enough
 
 Some UIs (canvas-drawn, game engines, custom-rendered text) don't expose

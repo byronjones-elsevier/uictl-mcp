@@ -9,8 +9,13 @@ struct FocusCommand: ParsableCommand {
         held window's app is frontmost and, if not, re-activates and raises \
         it before acting — countering a human's own mouse/keyboard use (e.g. \
         clicking into the terminal running uictl) stealing focus away from \
-        whatever uictl is mid-task automating. Release the hold when done so \
-        later commands stop being redirected.
+        whatever uictl is mid-task automating. Each of those commands' \
+        response then includes a "focusHold" field: "alreadyFrontmost" if \
+        nothing needed to change, "reactivated" if it did and the held \
+        window is now frontmost, or "failed" if the attempt didn't stick — \
+        don't assume the action landed on the intended window when it's \
+        "failed". Release the hold when done so later commands stop being \
+        redirected.
         """,
         subcommands: [Hold.self, Release.self, Status.self]
     )

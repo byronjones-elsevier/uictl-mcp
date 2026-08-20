@@ -100,7 +100,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "focus.hold",
-        tool: Tool(name: "uictl_focus_hold", description: "Pin uictl to one window so every subsequent uictl_click/uictl_move/uictl_scroll/uictl_type/uictl_key call re-activates and raises it first if it isn't already frontmost. Use this before a sequence of actions on a window that a human might click away from mid-task (e.g. clicking back into the terminal running this agent) — it counters exactly that focus steal. Call uictl_focus_release when done.",
+        tool: Tool(name: "uictl_focus_hold", description: "Pin uictl to one window so every subsequent uictl_click/uictl_move/uictl_scroll/uictl_type/uictl_key call re-activates and raises it first if it isn't already frontmost. Requires window or app (at least one — window wins if both are given) to identify which window to hold. Use this before a sequence of actions on a window that a human might click away from mid-task (e.g. clicking back into the terminal running this agent) — it counters exactly that focus steal. Call uictl_focus_release when done.",
                    inputSchema: schema([
                        "window": prop("integer", "Window id (from uictl_windows) to hold."),
                        "app": prop("string", "App whose frontmost window to hold (name substring, bundle id, or pid)."),
@@ -142,7 +142,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "click",
-        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error. Restores the cursor to its pre-click position afterward unless hoverCursor is set. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
+        tool: Tool(name: "uictl_click", description: "Click at a screen point or on a specific element (by id from uictl_elements/uictl_screenshot). Element clicks include a \"verification\" field in the response: \"changed\"/\"unchanged\" if the element's AXValue/AXSelected could be diffed before and after, or \"unavailable\" if it exposed neither (common for custom-drawn/webview controls) — don't assume success just because the call didn't error. Restores the cursor to its pre-click position afterward unless hoverCursor is set. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point. If uictl_focus_hold is active, the response also includes \"focusHold\": \"alreadyFrontmost\"/\"reactivated\"/\"failed\", reporting whether the held window needed refocusing first and whether that succeeded.",
                    inputSchema: schema([
                        "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
                        "element": prop("string", "Element id."),
@@ -156,7 +156,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "move",
-        tool: Tool(name: "uictl_move", description: "Move the mouse cursor without clicking. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
+        tool: Tool(name: "uictl_move", description: "Move the mouse cursor without clicking. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point. If uictl_focus_hold is active, the response also includes \"focusHold\": \"alreadyFrontmost\"/\"reactivated\"/\"failed\".",
                    inputSchema: schema([
                        "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
                        "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
@@ -165,7 +165,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "scroll",
-        tool: Tool(name: "uictl_scroll", description: "Scroll at a screen point. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point.",
+        tool: Tool(name: "uictl_scroll", description: "Scroll at a screen point. If window/app is given alongside at, at is relative to that window's current top-left corner instead of an absolute global-screen point. If uictl_focus_hold is active, the response also includes \"focusHold\": \"alreadyFrontmost\"/\"reactivated\"/\"failed\".",
                    inputSchema: schema([
                        "at": prop("string", "\"x,y\" point. Relative to window/app's top-left corner if either is given, otherwise global."),
                        "window": prop("integer", "Window id (from uictl_windows) that at is relative to."),
@@ -177,7 +177,7 @@ private let toolDefinitions: [ToolSpec] = [
     ToolSpec(
         command: "type",
         tool: Tool(name: "uictl_type",
-                   description: "Type text into the focused control, or into a specific element by id (tries setting its value directly, falls back to focus + synthesized keystrokes).",
+                   description: "Type text into the focused control, or into a specific element by id (tries setting its value directly, falls back to focus + synthesized keystrokes). If uictl_focus_hold is active, the response also includes \"focusHold\": \"alreadyFrontmost\"/\"reactivated\"/\"failed\".",
                    inputSchema: schema([
                        "text": prop("string", "Text to type."),
                        "element": prop("string", "Element id to type into."),
@@ -185,7 +185,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "key",
-        tool: Tool(name: "uictl_key", description: "Send a keyboard shortcut, e.g. \"cmd+shift+4\".",
+        tool: Tool(name: "uictl_key", description: "Send a keyboard shortcut, e.g. \"cmd+shift+4\". If uictl_focus_hold is active, the response also includes \"focusHold\": \"alreadyFrontmost\"/\"reactivated\"/\"failed\".",
                    inputSchema: schema(["combo": prop("string", "Modifiers joined with +: cmd, shift, alt/option, ctrl/control, fn.")], required: ["combo"]))
     ),
     ToolSpec(

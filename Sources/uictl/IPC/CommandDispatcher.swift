@@ -61,31 +61,31 @@ enum CommandDispatcher {
                 return try runElements(params)
 
             case "click":
-                FocusHold.ensureFocused()
-                return try runClick(params)
+                let refocus = FocusHold.ensureFocused()
+                return attachFocusHold(try runClick(params), refocus)
 
             case "move":
-                FocusHold.ensureFocused()
+                let refocus = FocusHold.ensureFocused()
                 try InputSynthesis.move(to: try resolvePoint(params))
-                return successResponse(["moved": true])
+                return attachFocusHold(successResponse(["moved": true]), refocus)
 
             case "scroll":
-                FocusHold.ensureFocused()
+                let refocus = FocusHold.ensureFocused()
                 let point = try resolvePoint(params)
                 let dx = Int32(params["dx"] as? Int ?? 0)
                 let dy = Int32(params["dy"] as? Int ?? 0)
                 try InputSynthesis.scroll(at: point, dx: dx, dy: dy)
-                return successResponse(["scrolled": true])
+                return attachFocusHold(successResponse(["scrolled": true]), refocus)
 
             case "type":
-                FocusHold.ensureFocused()
-                return try runType(params)
+                let refocus = FocusHold.ensureFocused()
+                return attachFocusHold(try runType(params), refocus)
 
             case "key":
-                FocusHold.ensureFocused()
+                let refocus = FocusHold.ensureFocused()
                 guard let combo = params["combo"] as? String else { throw UICtlError.message("\"combo\" is required") }
                 try InputSynthesis.sendKeyCombo(combo)
-                return successResponse(["sent": combo])
+                return attachFocusHold(successResponse(["sent": combo]), refocus)
 
             case "waitFor":
                 return try runWaitFor(params)
@@ -432,6 +432,21 @@ enum CommandDispatcher {
 
         let resolved = try WindowResolver.resolve(windowID: params["window"] as? Int, appSelector: params["app"] as? String)
         return CGPoint(x: resolved.frame.origin.x + point.x, y: resolved.frame.origin.y + point.y)
+    }
+
+    // MARK: - Focus hold
+
+    /// Merges `FocusHold.ensureFocused()`'s result into a success response's
+    /// `"data"`, so a caller can tell a genuine refocus failure (the action
+    /// that follows may have landed on the wrong window) apart from there
+    /// being no active hold at all. Omitted entirely when there's no hold,
+    /// to keep the common (no focus-hold in use) case's response unchanged.
+    private static func attachFocusHold(_ response: JSONDict, _ refocus: FocusHold.RefocusResult) -> JSONDict {
+        guard refocus != .notHeld, var data = response["data"] as? JSONDict else { return response }
+        data["focusHold"] = refocus.rawValue
+        var merged = response
+        merged["data"] = data
+        return merged
     }
 }
 
