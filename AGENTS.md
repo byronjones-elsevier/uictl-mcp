@@ -78,6 +78,49 @@ implementation details.
    good evidence the click landed; `"unavailable"` isn't evidence either
    way — still verify those independently.
 
+## Holding focus across a human's own clicks
+
+If a human at the machine clicks into another window mid-task (very commonly
+the terminal/IDE window running you, the agent, itself) while you're
+automating something else, that steals frontmost status — your next
+`type`/`key` call can go to the wrong window, and `click`/`move`/`scroll`
+may land relative to a window that's no longer actually on top.
+
+```sh
+uictl focus hold --app <AppName>
+```
+
+Once held, `click`, `move`, `scroll`, `type`, and `key` all check whether
+the held window's app is frontmost before acting and, if not, re-activate
+and raise it first — so a human clicking away and back doesn't derail the
+sequence. Release it when you're done with that window:
+
+```sh
+uictl focus release
+```
+
+`release` also restores focus to whatever was frontmost right before you
+started holding — typically the terminal/IDE you're running in — so you
+don't have to `uictl activate` your way back afterward. If you `hold`
+again to re-target a different window without releasing in between, that
+original snapshot is left alone; only the *first* `hold` in the sequence
+captures it, and `release` restores to that one.
+
+`uictl focus status` shows what's currently held (if anything), whether
+it's frontmost right now, and what `release` will restore focus to
+(`"restoresTo"`). The hold is best-effort: if the held window has since
+closed, focus-sensitive actions just proceed without re-focusing rather
+than failing outright — release and re-hold once you've picked a new
+target.
+
+Every focus-sensitive command's response also carries a `focusHold` field
+while a hold is active — `"alreadyFrontmost"`, `"reactivated"`, or
+`"failed"`. Check it rather than assuming the action landed where you
+aimed: a `"failed"` result means the click/type/key that just ran may well
+have gone to the wrong window (e.g. the held app has quit). `release`'s
+response carries the analogous `"restoredFocus"` field for the restore
+step, omitted if there was nothing to restore.
+
 ## When accessibility elements aren't enough
 
 Some UIs (canvas-drawn, game engines, custom-rendered text) don't expose

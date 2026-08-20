@@ -25,6 +25,7 @@ struct Root: ParsableCommand {
             DisplaysCommand.self,
             WindowsCommand.self,
             ActivateCommand.self,
+            FocusCommand.self,
             ScreenshotCommand.self,
             ElementsCommand.self,
             ClickCommand.self,
