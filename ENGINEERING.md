@@ -39,6 +39,59 @@ an `AXUIElement` reference across invocations. Since `elements`/`screenshot
 <id>` needs to resolve back to a live `AXUIElement`, that cache has to live
 somewhere longer-lived than one CLI invocation — hence the daemon.
 
+## Activity log window
+
+Every command that reaches `CommandDispatcher.dispatch` is timed and recorded
+into `ActivityLog.shared` (`Core/ActivityLog.swift`), which the GUI layer
+(`Sources/uictl/GUI/*`) observes to show a transient toast per call and drive
+the `uictl log show` window. This is the first on-screen UI anywhere in this
+codebase, which mattered for `DaemonServer.run`: it previously ran a bare
+blocking `accept()` loop directly on the main thread, but an `NSApplication`
+run loop (needed to pump events for any window) can't share a thread with a
+permanently-blocking BSD socket call. The accept/dispatch loop now runs on a
+dedicated background `Thread` (`DaemonServer.acceptLoop`, unchanged otherwise
+— still one request at a time), freeing the main thread for
+`NSApplication.shared.run()`. The app runs with `.accessory` activation
+policy (no Dock icon/app-switcher entry) — it's still a background daemon,
+just one that can now show a couple of small windows. Because dispatch runs
+on the background thread while AppKit runs on the main thread, every UI
+update the GUI layer makes in response to a recorded call
+(`ActivityLog.onRecord`) hops to the main thread via `DispatchQueue.main.async`.
+
+**Re-summoning a buried window.** `.accessory` policy means no Dock icon and
+no Cmd-Tab entry, so once the log window is behind other windows, there's no
+OS-level way back to it except running `uictl log show` again. That case's
+handler therefore does more than `showWindow(nil)`: it also calls
+`NSApp.activate(ignoringOtherApps: true)` and `window?.orderFrontRegardless()`.
+Both matter — `uictl activate --app uictl` (`NSRunningApplication.activate`,
+called *from a different process*) was observed consistently failing against
+this daemon's own process specifically (every other app tested during this
+work activated fine); self-activation from *within* the process is a
+different, evidently more permitted code path. Root cause not confirmed, but
+plausibly a macOS restriction on `.accessory`/unbundled processes activating
+themselves via that external API.
+
+**Security note — sensitive on-screen content is not redacted.**
+`ActivityLog.summarizeParams`/`summarizeResponse` (`Core/ActivityLog.swift`)
+redact `"text"` for `type`/`clipboard.set`/`clipboard.get` specifically,
+since those are the one param/response shape where secret content flows
+through uictl's own arguments (a password typed into a field, clipboard
+content). They deliberately do **not** redact `ocr`/`elements`/`screenshot`
+output: those commands' entire purpose is to read whatever is genuinely on
+screen, and there's no reliable way to distinguish "just app UI" from
+"a password field someone left visible" from plain text content — attempting
+to guess would either miss real secrets or break the feature for everything
+else. Whatever is on screen when one of those commands runs — which can
+include passwords, tokens, or other sensitive text the automated app happens
+to display — ends up in the activity log (on-screen table and any
+`uictl_log_export`/`uictl log export` JSON output) and in any screenshot
+file `screenshot`/`screenshot --annotate` writes to disk. Treat the activity
+log window, its JSON exports, and saved screenshots as potentially
+containing sensitive data: don't leave the log window on-screen or its
+exports lying around on a shared or untrusted machine, and manage/dispose of
+screenshot files with the same care as any other capture of your screen's
+contents.
+
 ## Coordinate spaces
 
 Three coordinate spaces are in play, and getting them confused is the most
@@ -117,6 +170,23 @@ tree fine; it's specifically `click --element <id>` on such a window that
 would miss, since it clicks at the AX-reported frame's center in global
 screen coordinates. Verified working end-to-end against TextEdit (multiple
 simultaneous windows, exact frame agreement between AX and CGWindowList).
+
+Separately: uictl cannot reliably drive its **own** GUI (the activity log
+window, see "Activity log window" below) via its own `click --element`/
+`click --at`. `Accessibility.frame(of:)` against one of that window's own
+AXUIElements — a self-referential query, the daemon's background accept
+thread asking AppKit's in-process accessibility bridging about a view owned
+by that same process's main thread — intermittently or consistently returns
+no frame, and even a raw-coordinate `click --at` verified (via OCR) to land
+exactly on the "Export JSON…" button did not trigger it, across several
+repeated attempts including back-to-back double-clicks. Root cause not
+isolated (candidates: main-thread affinity of in-process AX/view state,
+something specific to an unbundled, `.accessory`-policy, `Process()`-spawned
+app's window-server session) — but this is irrelevant to uictl's actual job
+of driving *other* apps, which this session's testing exercised extensively
+(TextEdit, Chrome, Terminal, etc.) with no such issue. A real mouse click
+from a human never goes through any of uictl's code at all, so this caveat
+only affects uictl-driving-uictl, not normal use.
 
 ## App-name resolution across restarts
 
