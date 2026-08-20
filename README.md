@@ -29,9 +29,10 @@ click/type into it without a human at the keyboard.
   so every subsequent click/move/scroll/type/key call re-activates and raises
   it first if it isn't already frontmost — countering a human's own
   mouse/keyboard use (e.g. clicking back into the terminal running the agent)
-  stealing focus away from whatever uictl is mid-task automating. Release
-  with `uictl focus release`; check the current hold with `uictl focus
-  status`.
+  stealing focus away from whatever uictl is mid-task automating. `uictl
+  focus release` stops the hold and restores focus to whatever was
+  frontmost right before it began (typically that same terminal); check the
+  current hold, and what release will restore, with `uictl focus status`.
 - **Wait** — block until an element matching a role/title appears.
 - **Read** — OCR a window or image region, sample a pixel's color,
   read/write the clipboard.

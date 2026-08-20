@@ -100,7 +100,7 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "focus.hold",
-        tool: Tool(name: "uictl_focus_hold", description: "Pin uictl to one window so every subsequent uictl_click/uictl_move/uictl_scroll/uictl_type/uictl_key call re-activates and raises it first if it isn't already frontmost. Requires window or app (at least one — window wins if both are given) to identify which window to hold. Use this before a sequence of actions on a window that a human might click away from mid-task (e.g. clicking back into the terminal running this agent) — it counters exactly that focus steal. Call uictl_focus_release when done.",
+        tool: Tool(name: "uictl_focus_hold", description: "Pin uictl to one window so every subsequent uictl_click/uictl_move/uictl_scroll/uictl_type/uictl_key call re-activates and raises it first if it isn't already frontmost. Requires window or app (at least one — window wins if both are given) to identify which window to hold. Use this before a sequence of actions on a window that a human might click away from mid-task (e.g. clicking back into the terminal running this agent) — it counters exactly that focus steal. If nothing is currently held, this also snapshots whatever's frontmost right now so uictl_focus_release can restore it afterward; calling this again to re-target a different window without releasing in between leaves that original snapshot alone. Call uictl_focus_release when done.",
                    inputSchema: schema([
                        "window": prop("integer", "Window id (from uictl_windows) to hold."),
                        "app": prop("string", "App whose frontmost window to hold (name substring, bundle id, or pid)."),
@@ -108,11 +108,11 @@ private let toolDefinitions: [ToolSpec] = [
     ),
     ToolSpec(
         command: "focus.release",
-        tool: Tool(name: "uictl_focus_release", description: "Stop holding focus on whatever window uictl_focus_hold last set.", inputSchema: schema([:]))
+        tool: Tool(name: "uictl_focus_release", description: "Stop holding focus on whatever window uictl_focus_hold last set, and restore focus to whatever was frontmost right before that hold began (if it could be captured) — the response's \"restoredFocus\" field reports \"alreadyFrontmost\"/\"reactivated\"/\"failed\", omitted if there was nothing to restore.", inputSchema: schema([:]))
     ),
     ToolSpec(
         command: "focus.status",
-        tool: Tool(name: "uictl_focus_status", description: "Show what window (if any) is currently held via uictl_focus_hold, and whether its app is currently frontmost.", inputSchema: schema([:]))
+        tool: Tool(name: "uictl_focus_status", description: "Show what window (if any) is currently held via uictl_focus_hold, whether its app is currently frontmost, and (via \"restoresTo\") what uictl_focus_release will restore focus to.", inputSchema: schema([:]))
     ),
     ToolSpec(
         command: "screenshot",

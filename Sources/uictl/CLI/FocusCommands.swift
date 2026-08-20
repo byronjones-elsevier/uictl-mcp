@@ -14,14 +14,26 @@ struct FocusCommand: ParsableCommand {
         nothing needed to change, "reactivated" if it did and the held \
         window is now frontmost, or "failed" if the attempt didn't stick — \
         don't assume the action landed on the intended window when it's \
-        "failed". Release the hold when done so later commands stop being \
-        redirected.
+        "failed". The first `hold` in a hold/[hold...]/release sequence \
+        also snapshots whatever was frontmost right before it — typically \
+        the terminal/IDE this agent is running in — so `release` can put \
+        focus back there automatically instead of leaving it on the \
+        automation target.
         """,
         subcommands: [Hold.self, Release.self, Status.self]
     )
 
     struct Hold: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Start holding focus on a window.")
+        static let configuration = CommandConfiguration(
+            abstract: "Start holding focus on a window.",
+            discussion: """
+            If nothing is currently held, also snapshots whatever's \
+            frontmost right now so a later `release` can restore it. \
+            Re-targeting to a different window while already holding one \
+            (calling `hold` again without an intervening `release`) leaves \
+            that original snapshot alone.
+            """
+        )
 
         @Option(help: "Window id (from `windows`) to hold.")
         var window: Int?
@@ -38,7 +50,16 @@ struct FocusCommand: ParsableCommand {
     }
 
     struct Release: ParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Stop holding focus.")
+        static let configuration = CommandConfiguration(
+            abstract: "Stop holding focus.",
+            discussion: """
+            Also restores focus to whatever was frontmost right before the \
+            first `hold` in this sequence, if that could be captured — the \
+            response's "restoredFocus" field reports the outcome \
+            ("alreadyFrontmost"/"reactivated"/"failed"), omitted entirely \
+            if there was nothing to restore.
+            """
+        )
 
         func run() throws {
             emit(DaemonClient.send(command: "focus.release", params: [:]))

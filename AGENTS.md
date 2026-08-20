@@ -99,17 +99,27 @@ sequence. Release it when you're done with that window:
 uictl focus release
 ```
 
-`uictl focus status` shows what's currently held (if anything) and whether
-it's frontmost right now. The hold is best-effort: if the held window has
-since closed, focus-sensitive actions just proceed without re-focusing
-rather than failing outright — release and re-hold once you've picked a new
+`release` also restores focus to whatever was frontmost right before you
+started holding — typically the terminal/IDE you're running in — so you
+don't have to `uictl activate` your way back afterward. If you `hold`
+again to re-target a different window without releasing in between, that
+original snapshot is left alone; only the *first* `hold` in the sequence
+captures it, and `release` restores to that one.
+
+`uictl focus status` shows what's currently held (if anything), whether
+it's frontmost right now, and what `release` will restore focus to
+(`"restoresTo"`). The hold is best-effort: if the held window has since
+closed, focus-sensitive actions just proceed without re-focusing rather
+than failing outright — release and re-hold once you've picked a new
 target.
 
 Every focus-sensitive command's response also carries a `focusHold` field
 while a hold is active — `"alreadyFrontmost"`, `"reactivated"`, or
 `"failed"`. Check it rather than assuming the action landed where you
 aimed: a `"failed"` result means the click/type/key that just ran may well
-have gone to the wrong window (e.g. the held app has quit).
+have gone to the wrong window (e.g. the held app has quit). `release`'s
+response carries the analogous `"restoredFocus"` field for the restore
+step, omitted if there was nothing to restore.
 
 ## When accessibility elements aren't enough
 
