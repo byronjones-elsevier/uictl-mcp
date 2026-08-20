@@ -80,6 +80,42 @@ uictl permissions --request   # triggers the OS prompts
 uictl permissions             # check status any time
 ```
 
+## Hello World
+
+The smallest possible walkthrough: launch a text editor, find its window,
+bring it to front, and type into it. uictl deliberately has no "launch an
+app" command (that's app-specific, and you already have a shell/agent that
+can do it), so that one step uses `open` directly.
+
+**From the command line:**
+
+```sh
+open -a TextEdit                             # launch it — uictl finds windows, it doesn't launch apps
+uictl windows --app TextEdit                 # confirm it's running and find its window (auto-starts the uictl daemon on first use)
+uictl activate --app TextEdit                # bring it to front
+uictl type "Hello World"                     # type into whatever's focused — the new document's text area
+```
+
+**In an agent session** (uictl registered as an MCP server — see below):
+you'd ask the agent to do the same thing in plain English, e.g. "open
+TextEdit and type Hello World into it." It launches the app itself (its own
+shell access, same as `open -a TextEdit` above), then drives it with the
+matching MCP tool calls:
+
+```
+uictl_windows({"app": "TextEdit"})
+uictl_activate({"app": "TextEdit"})
+uictl_type({"text": "Hello World"})
+```
+
+Same three steps either way — `uictl_windows` confirms the window exists,
+`uictl_activate` brings it to front, `uictl_type` (with no `element` given)
+sends keystrokes to whatever currently has keyboard focus, which for a
+freshly created document is its own text area. See "Recommended agent
+workflow" below for the more robust version of this (finding a specific
+element by id instead of relying on whatever already has focus) once
+you're doing more than typing into a blank document.
+
 ## Architecture in one paragraph
 
 `uictl` is a thin CLI/MCP front end over a small background daemon. The
