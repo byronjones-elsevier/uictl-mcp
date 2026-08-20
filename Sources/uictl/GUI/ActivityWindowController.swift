@@ -31,19 +31,35 @@ final class ActivityWindowController: NSWindowController {
         window.title = "uictl Activity Log"
         window.center()
         super.init(window: window)
+        window.delegate = self
         buildUI()
     }
 
     required init?(coder: NSCoder) { fatalError("not intended for storyboard/nib loading") }
+
+    /// `UICtlGate` only enforces the checkbox's state while this window is
+    /// open — see its doc comment — so every path that brings the window on
+    /// screen needs to mark it open here rather than relying on `init` (this
+    /// controller is reused across repeated `log show` calls, not recreated).
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        UICtlGate.setWindowOpen(true)
+    }
 
     private func buildUI() {
         guard let contentView = window?.contentView else { return }
         let bounds = contentView.bounds
 
         bannerLabel.font = .boldSystemFont(ofSize: 13)
-        bannerLabel.frame = NSRect(x: 14, y: bounds.height - 30, width: bounds.width - 150, height: 20)
+        bannerLabel.frame = NSRect(x: 14, y: bounds.height - 30, width: bounds.width - 340, height: 20)
         bannerLabel.autoresizingMask = [.width, .minYMargin]
         contentView.addSubview(bannerLabel)
+
+        let gateCheckbox = NSButton(checkboxWithTitle: "Commands enabled", target: self, action: #selector(gateToggled(_:)))
+        gateCheckbox.state = .on
+        gateCheckbox.frame = NSRect(x: bounds.width - 320, y: bounds.height - 32, width: 170, height: 20)
+        gateCheckbox.autoresizingMask = [.minXMargin, .minYMargin]
+        contentView.addSubview(gateCheckbox)
 
         let exportButton = NSButton(title: "Export JSON…", target: self, action: #selector(exportTapped))
         exportButton.bezelStyle = .rounded
@@ -89,6 +105,10 @@ final class ActivityWindowController: NSWindowController {
         idleTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
             self?.bannerLabel.stringValue = "Idle"
         }
+    }
+
+    @objc private func gateToggled(_ sender: NSButton) {
+        UICtlGate.setToggleEnabled(sender.state == .on)
     }
 
     @objc private func exportTapped() {
@@ -148,6 +168,12 @@ final class ActivityWindowController: NSWindowController {
         activePopover = popover
 
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+    }
+}
+
+extension ActivityWindowController: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        UICtlGate.setWindowOpen(false)
     }
 }
 

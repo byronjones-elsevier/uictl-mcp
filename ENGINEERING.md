@@ -81,6 +81,23 @@ different, evidently more permitted code path. Root cause not confirmed, but
 plausibly a macOS restriction on `.accessory`/unbundled processes activating
 themselves via that external API.
 
+**Commands-enabled kill switch.** The log window has a "Commands enabled"
+checkbox backed by `UICtlGate` (`Core/UICtlGate.swift`). `CommandDispatcher
+.dispatch` checks `UICtlGate.commandsEnabled` before doing anything else and,
+if false, returns an error response without touching `dispatchInner` — the
+blocked attempt still gets timed and recorded into `ActivityLog` like any
+other call, so it's visible in the table rather than silently vanishing.
+The gate only takes effect while the window is open: `ActivityWindowController
+.showWindow` calls `UICtlGate.setWindowOpen(true)`, and the
+`NSWindowDelegate.windowWillClose` callback calls `setWindowOpen(false)`, so
+closing the window (rather than unchecking the box) is itself a way back to
+"always enabled" — this is deliberate, since the checkbox that re-enables
+commands lives inside the window it would otherwise be impossible to get
+back to. `UICtlGate`'s own state is read/written from both the daemon's
+background accept-loop thread (`dispatch`) and the main thread (the checkbox
+and window-close callbacks), hence the internal `DispatchQueue.sync` rather
+than a bare `Bool`.
+
 **Security note — sensitive on-screen content is not redacted.**
 `ActivityLog.summarizeParams`/`summarizeResponse` (`Core/ActivityLog.swift`)
 redact `"text"` for `type`/`clipboard.set`/`clipboard.get` specifically,
