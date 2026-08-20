@@ -159,6 +159,9 @@ enum CommandDispatcher {
         var axElement: AXUIElement?
 
         if let elementID = params["element"] as? String {
+            guard params["window"] == nil, params["app"] == nil else {
+                throw UICtlError.message("\"window\"/\"app\" have no effect when \"element\" is set (the element's own position is used); omit them")
+            }
             let element = try Accessibility.lookupElement(elementID: elementID)
             guard let elementFrame = Accessibility.frame(of: element) else {
                 throw UICtlError.message("element \"\(elementID)\" no longer has a frame")
@@ -169,7 +172,7 @@ enum CommandDispatcher {
             }
             axElement = element
             point = elementFrame.center
-        } else if params["at"] is String {
+        } else if params["at"] != nil {
             point = try resolvePoint(params)
         } else {
             throw UICtlError.message("either \"at\" or \"element\" is required")
@@ -263,9 +266,12 @@ enum CommandDispatcher {
     /// given, translates it against that window's *current* frame — resolved
     /// fresh here, not from a possibly-stale screenshot — instead of treating
     /// it as an absolute global-Quartz point. Without `"window"`/`"app"`,
-    /// behavior is unchanged: a pure global point.
+    /// behavior is unchanged: a pure global point. If both `"window"` and
+    /// `"app"` are given, `"window"` wins (same precedence as
+    /// `WindowResolver.resolve` already applies elsewhere).
     private static func resolvePoint(_ params: JSONDict) throws -> CGPoint {
-        guard let atText = params["at"] as? String else { throw UICtlError.message("\"at\" is required") }
+        guard let atValue = params["at"] else { throw UICtlError.message("\"at\" is required") }
+        guard let atText = atValue as? String else { throw UICtlError.message("\"at\" must be a string \"x,y\"") }
         let point = try parsePoint(atText)
 
         guard params["window"] != nil || params["app"] != nil else { return point }

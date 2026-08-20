@@ -91,8 +91,11 @@ default. Passing `window` (a window id) or `app` (an app selector) alongside
 `"at"` switches it to a window-relative point instead:
 `CommandDispatcher.resolvePoint` re-resolves that window's *current* frame
 via `WindowResolver.resolve` at call time — not from a cached/stale
-screenshot — and adds `"at"` to its origin. This is both a multi-display
-convenience (no manual arithmetic against `uictl displays`' bounds) and more
+screenshot — and adds `"at"` to `frame.origin`, i.e. the window's top-left
+corner in the same global-Quartz, top-left/y-down space described above (if
+both `window` and `app` are given, `window` wins). This is both a
+multi-display convenience (no manual arithmetic against `uictl displays`'
+bounds) and more
 robust to the window having moved since it was last located.
 
 ## Window → AXUIElement correlation
